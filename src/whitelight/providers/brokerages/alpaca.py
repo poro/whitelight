@@ -83,7 +83,7 @@ class AlpacaClient(BrokerageClient):
             logger.info("Alpaca connection validated")
         except APIError as e:
             err = str(e).lower()
-            if "forbidden" in err or "unauthorized" in err:
+            if "forbidden" in err or "not authorized" in err or "unauthorized" in err:
                 raise AuthenticationError(f"Alpaca auth failed: {e}", brokerage="alpaca")
             raise BrokerageConnectionError(f"Alpaca connection failed: {e}", brokerage="alpaca")
         except Exception as e:
