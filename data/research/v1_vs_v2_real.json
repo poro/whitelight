@@ -1,0 +1,290 @@
+{
+  "1yr": {
+    "v1_production": {
+      "label": "v1_production",
+      "start": "2025-02-20",
+      "end": "2026-02-22",
+      "final": 104247.0,
+      "cagr": 4.26,
+      "max_dd": 48.96,
+      "sharpe": 0.267,
+      "sortino": 0.243,
+      "calmar": 0.087,
+      "pf": 0.31,
+      "trades": 31,
+      "win_rate": 48.4,
+      "avg_duration": 68.5
+    },
+    "v2_voladaptive": {
+      "label": "v2_voladaptive",
+      "start": "2025-02-20",
+      "end": "2026-02-22",
+      "final": 129326.0,
+      "cagr": 29.46,
+      "max_dd": 24.15,
+      "sharpe": 0.763,
+      "sortino": 0.809,
+      "calmar": 1.22,
+      "pf": 1.46,
+      "trades": 80,
+      "win_rate": 65.0,
+      "avg_duration": 12.8
+    }
+  },
+  "2yr": {
+    "v1_production": {
+      "label": "v1_production",
+      "start": "2024-02-20",
+      "end": "2026-02-22",
+      "final": 163867.0,
+      "cagr": 28.14,
+      "max_dd": 51.15,
+      "sharpe": 0.661,
+      "sortino": 0.602,
+      "calmar": 0.55,
+      "pf": 1.75,
+      "trades": 71,
+      "win_rate": 73.2,
+      "avg_duration": 178.3
+    },
+    "v2_voladaptive": {
+      "label": "v2_voladaptive",
+      "start": "2024-02-20",
+      "end": "2026-02-22",
+      "final": 168641.0,
+      "cagr": 30.0,
+      "max_dd": 28.17,
+      "sharpe": 0.785,
+      "sortino": 0.801,
+      "calmar": 1.065,
+      "pf": 1.54,
+      "trades": 185,
+      "win_rate": 71.4,
+      "avg_duration": 17.6
+    }
+  },
+  "3_5yr": {
+    "v1_production": {
+      "label": "v1_production",
+      "start": "2022-07-23",
+      "end": "2026-02-22",
+      "final": 268249.0,
+      "cagr": 31.94,
+      "max_dd": 51.53,
+      "sharpe": 0.716,
+      "sortino": 0.686,
+      "calmar": 0.62,
+      "pf": 2.95,
+      "trades": 148,
+      "win_rate": 57.4,
+      "avg_duration": 320.6
+    },
+    "v2_voladaptive": {
+      "label": "v2_voladaptive",
+      "start": "2022-07-23",
+      "end": "2026-02-22",
+      "final": 303401.0,
+      "cagr": 36.59,
+      "max_dd": 34.05,
+      "sharpe": 0.885,
+      "sortino": 0.946,
+      "calmar": 1.075,
+      "pf": 1.6,
+      "trades": 299,
+      "win_rate": 70.6,
+      "avg_duration": 17.8
+    }
+  },
+  "covid": {
+    "v1_production": {
+      "label": "v1_production",
+      "start": "2020-01-02",
+      "end": "2021-12-31",
+      "final": 308868.0,
+      "cagr": 75.75,
+      "max_dd": 46.44,
+      "sharpe": 1.244,
+      "sortino": 1.078,
+      "calmar": 1.631,
+      "pf": 4.84,
+      "trades": 124,
+      "win_rate": 92.7,
+      "avg_duration": 217.3
+    },
+    "v2_voladaptive": {
+      "label": "v2_voladaptive",
+      "start": "2020-01-02",
+      "end": "2021-12-31",
+      "final": 256574.0,
+      "cagr": 60.18,
+      "max_dd": 34.65,
+      "sharpe": 1.267,
+      "sortino": 1.194,
+      "calmar": 1.737,
+      "pf": 1.9,
+      "trades": 159,
+      "win_rate": 74.8,
+      "avg_duration": 24.1
+    }
+  },
+  "bear_2022": {
+    "v1_production": {
+      "label": "v1_production",
+      "start": "2022-01-03",
+      "end": "2022-10-31",
+      "final": 66702.0,
+      "cagr": -38.77,
+      "max_dd": 42.27,
+      "sharpe": -0.658,
+      "sortino": -0.645,
+      "calmar": -0.917,
+      "pf": 0.57,
+      "trades": 96,
+      "win_rate": 39.6,
+      "avg_duration": 62.7
+    },
+    "v2_voladaptive": {
+      "label": "v2_voladaptive",
+      "start": "2022-01-03",
+      "end": "2022-10-31",
+      "final": 113484.0,
+      "cagr": 16.56,
+      "max_dd": 16.48,
+      "sharpe": 0.484,
+      "sortino": 0.541,
+      "calmar": 1.005,
+      "pf": 1.5,
+      "trades": 78,
+      "win_rate": 75.6,
+      "avg_duration": 15.2
+    }
+  },
+  "bull_2023_24": {
+    "v1_production": {
+      "label": "v1_production",
+      "start": "2022-11-01",
+      "end": "2024-12-31",
+      "final": 352859.0,
+      "cagr": 79.53,
+      "max_dd": 33.92,
+      "sharpe": 1.335,
+      "sortino": 1.307,
+      "calmar": 2.345,
+      "pf": 15.82,
+      "trades": 80,
+      "win_rate": 81.2,
+      "avg_duration": 299.9
+    },
+    "v2_voladaptive": {
+      "label": "v2_voladaptive",
+      "start": "2022-11-01",
+      "end": "2024-12-31",
+      "final": 257873.0,
+      "cagr": 55.21,
+      "max_dd": 29.43,
+      "sharpe": 1.208,
+      "sortino": 1.337,
+      "calmar": 1.876,
+      "pf": 1.82,
+      "trades": 177,
+      "win_rate": 70.6,
+      "avg_duration": 20.5
+    }
+  },
+  "5yr": {
+    "v1_production": {
+      "label": "v1_production",
+      "start": "2021-02-20",
+      "end": "2026-02-22",
+      "final": 500213.0,
+      "cagr": 38.16,
+      "max_dd": 51.15,
+      "sharpe": 0.806,
+      "sortino": 0.774,
+      "calmar": 0.746,
+      "pf": 4.28,
+      "trades": 255,
+      "win_rate": 59.6,
+      "avg_duration": 269.3
+    },
+    "v2_voladaptive": {
+      "label": "v2_voladaptive",
+      "start": "2021-02-20",
+      "end": "2026-02-22",
+      "final": 464879.0,
+      "cagr": 36.14,
+      "max_dd": 29.43,
+      "sharpe": 0.882,
+      "sortino": 0.939,
+      "calmar": 1.228,
+      "pf": 1.65,
+      "trades": 412,
+      "win_rate": 70.2,
+      "avg_duration": 16.8
+    }
+  },
+  "6yr": {
+    "v1_production": {
+      "label": "v1_production",
+      "start": "2020-01-02",
+      "end": "2026-02-22",
+      "final": 950992.0,
+      "cagr": 44.53,
+      "max_dd": 51.15,
+      "sharpe": 0.886,
+      "sortino": 0.825,
+      "calmar": 0.871,
+      "pf": 4.51,
+      "trades": 342,
+      "win_rate": 72.5,
+      "avg_duration": 273.8
+    },
+    "v2_voladaptive": {
+      "label": "v2_voladaptive",
+      "start": "2020-01-02",
+      "end": "2026-02-22",
+      "final": 1044216.0,
+      "cagr": 46.76,
+      "max_dd": 34.65,
+      "sharpe": 1.061,
+      "sortino": 1.098,
+      "calmar": 1.349,
+      "pf": 1.72,
+      "trades": 515,
+      "win_rate": 72.8,
+      "avg_duration": 19.7
+    }
+  },
+  "max": {
+    "v1_production": {
+      "label": "v1_production",
+      "start": "2011-02-11",
+      "end": "2026-02-22",
+      "final": 11851706.0,
+      "cagr": 37.52,
+      "max_dd": 52.05,
+      "sharpe": 0.824,
+      "sortino": 0.776,
+      "calmar": 0.721,
+      "pf": 5.09,
+      "trades": 530,
+      "win_rate": 74.2,
+      "avg_duration": 290.3
+    },
+    "v2_voladaptive": {
+      "label": "v2_voladaptive",
+      "start": "2011-02-11",
+      "end": "2026-02-22",
+      "final": 5178734.0,
+      "cagr": 30.13,
+      "max_dd": 40.5,
+      "sharpe": 0.822,
+      "sortino": 0.866,
+      "calmar": 0.744,
+      "pf": 1.69,
+      "trades": 1191,
+      "win_rate": 71.1,
+      "avg_duration": 18.1
+    }
+  }
+}
