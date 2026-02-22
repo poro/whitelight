@@ -1,0 +1,64 @@
+"""Constants used throughout the White Light system."""
+
+# Traded instruments
+TQQQ = "TQQQ"
+SQQQ = "SQQQ"
+NDX = "NDX"
+
+TRADED_SYMBOLS = [TQQQ, SQQQ]
+ALL_SYMBOLS = [NDX, TQQQ, SQQQ]
+
+# SMA periods (days)
+SMA_SHORT = 10
+SMA_MEDIUM_FAST = 20
+SMA_MEDIUM = 50
+SMA_MEDIUM_SLOW = 100
+SMA_LONG = 250
+SMA_TREND_FILTER = 200
+
+# Momentum / velocity
+ROC_PERIOD = 14
+ROC_SMOOTH_PERIOD = 3
+VELOCITY_LOOKBACK = 5
+MOMENTUM_PERIOD = 20
+
+# Bollinger Bands
+BOLLINGER_PERIOD = 20
+BOLLINGER_STD_MULT = 2.0
+
+# RSI
+RSI_PERIOD = 14
+
+# Volatility
+VOL_SHORT_PERIOD = 20
+VOL_LONG_PERIOD = 60
+TRADING_DAYS_PER_YEAR = 252
+
+# Trend strength
+REGRESSION_PERIOD = 60
+REGRESSION_ZSCORE_LOOKBACK = 252
+
+# Execution window (minutes before market close)
+EXECUTION_WINDOW_START = 15
+EXECUTION_WINDOW_END = 1
+
+# Position limits (fraction of portfolio)
+MAX_TQQQ_ALLOCATION = 0.50
+MAX_SQQQ_ALLOCATION = 0.30
+
+# Minimum rebalance threshold (fraction)
+MIN_REBALANCE_THRESHOLD = 0.05
+
+# Retry
+MAX_RETRY_ATTEMPTS = 5
+RETRY_BACKOFF_BASE_SECONDS = 2.0
+RETRY_BACKOFF_MAX_SECONDS = 60.0
+MARKET_CLOSE_BUFFER_SECONDS = 60
+
+# Data
+HISTORY_START_DATE = "1985-01-01"
+CACHE_FORMAT = "parquet"
+
+# IB Gateway ports
+IBKR_LIVE_PORT = 7496
+IBKR_PAPER_PORT = 7497

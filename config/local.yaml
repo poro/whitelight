@@ -1,0 +1,19 @@
+deployment:
+  mode: "local"
+  log_level: "INFO"
+  log_format: "json"
+  log_dir: "/var/log/whitelight"
+
+secrets:
+  provider: "pass"
+  pass_prefix: "whitelight"
+
+alerts:
+  provider: "telegram"
+
+brokerages:
+  alpaca:
+    paper: false
+
+  ibkr:
+    gateway_port: 7496

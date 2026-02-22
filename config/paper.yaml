@@ -1,0 +1,22 @@
+deployment:
+  mode: "paper"
+  log_level: "DEBUG"
+  log_format: "text"
+  log_dir: "./logs"
+
+secrets:
+  provider: "env"
+
+alerts:
+  provider: "telegram"
+
+brokerages:
+  primary: "alpaca"
+  secondary: "ibkr"
+  failover_enabled: true
+
+  alpaca:
+    paper: true
+
+  ibkr:
+    gateway_port: 7497

@@ -1,0 +1,106 @@
+deployment:
+  mode: "local"
+  log_level: "INFO"
+  log_format: "json"
+  log_dir: "/var/log/whitelight"
+
+secrets:
+  provider: "env"
+  aws_region: "us-east-1"
+  aws_secret_name: "whitelight/credentials"
+  pass_prefix: "whitelight"
+
+alerts:
+  provider: "telegram"
+  composite_providers: []
+
+data:
+  polygon_base_url: "https://api.polygon.io"
+  cache_dir: "./data"
+  cache_format: "parquet"
+  tickers:
+    - "NDX"
+    - "TQQQ"
+    - "SQQQ"
+  history_start_date: "1985-01-01"
+  sync_timeout_seconds: 120
+
+brokerages:
+  primary: "alpaca"
+  secondary: "ibkr"
+  failover_enabled: true
+
+  alpaca:
+    paper: true
+    timeout_seconds: 30
+
+  ibkr:
+    gateway_host: "127.0.0.1"
+    gateway_port: 7497
+    client_id: 1
+    timeout_seconds: 30
+
+strategy:
+  substrategy_weights:
+    s1_primary_trend: 0.25
+    s2_intermediate_trend: 0.15
+    s3_short_term_trend: 0.10
+    s4_trend_strength: 0.10
+    s5_momentum_velocity: 0.15
+    s6_mean_rev_bollinger: 0.15
+    s7_volatility_regime: 0.10
+
+  allocation_tiers:
+    - threshold: 0.2
+      tqqq_scale: 0.60
+      tqqq_cap: 0.50
+      sqqq: 0.00
+    - threshold: -0.1
+      tqqq: 0.00
+      sqqq: 0.00
+    - threshold: -999
+      sqqq_scale: 0.40
+      sqqq_cap: 0.30
+      tqqq: 0.00
+
+  min_rebalance_threshold: 0.05
+
+  params:
+    s1_primary_trend:
+      fast_period: 50
+      slow_period: 250
+      hysteresis_pct: 0.005
+      confirmation_days: 2
+    s2_intermediate_trend:
+      fast_period: 20
+      slow_period: 100
+      confirmation_days: 1
+    s3_short_term_trend:
+      fast_period: 10
+      slow_period: 30
+    s4_trend_strength:
+      regression_period: 60
+      zscore_lookback: 252
+      sma_filter_period: 200
+    s5_momentum_velocity:
+      roc_period: 14
+      smooth_period: 3
+      fast_roc_period: 5
+    s6_mean_rev_bollinger:
+      period: 20
+      std_multiplier: 2.0
+      trend_filter_period: 200
+    s7_volatility_regime:
+      short_period: 20
+      long_period: 60
+      trend_filter_period: 100
+
+execution:
+  window_start_minutes_before_close: 15
+  window_end_minutes_before_close: 1
+  max_retry_attempts: 5
+  retry_backoff_base_seconds: 2.0
+  retry_backoff_max_seconds: 60.0
+  market_close_buffer_seconds: 60
+  order_type: "market"
+  min_order_value_usd: 10.0
