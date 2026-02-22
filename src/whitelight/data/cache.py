@@ -122,13 +122,14 @@ class CacheManager:
             logger.warning("Validation failed for %s: duplicate dates found", ticker)
             return False
 
-        # Gap check: no gap > 5 calendar days (handles typical holidays).
+        # Gap check: no gap > 10 calendar days (handles extended closures
+        # like the 7-day NYSE shutdown after 9/11).
         if len(dates) > 1:
             gaps = dates.diff().dropna()
             max_gap = gaps.max()
-            if max_gap > pd.Timedelta(days=5):
+            if max_gap > pd.Timedelta(days=10):
                 logger.warning(
-                    "Validation failed for %s: max gap of %s exceeds 5 days",
+                    "Validation failed for %s: max gap of %s exceeds 10 days",
                     ticker,
                     max_gap,
                 )

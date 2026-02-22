@@ -26,6 +26,7 @@ env/
 # Data cache (large files, regenerated)
 data/*.parquet
 data/*.csv
+data/backtest_results/
 
 # Testing
 .pytest_cache/
