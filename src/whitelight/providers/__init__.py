@@ -47,6 +47,9 @@ def create_alert_provider(config: AlertsConfig, secrets: SecretsProvider) -> Ale
             return NtfyAlertProvider(
                 topic=secrets.get_secret("ntfy/topic"),
             )
+        case "noop" | "none":
+            from .alerts.noop import NoopAlertProvider
+            return NoopAlertProvider()
         case "composite":
             from .alerts.composite import CompositeAlertProvider
             providers = [

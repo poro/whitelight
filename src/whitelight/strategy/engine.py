@@ -60,4 +60,4 @@ class StrategyEngine:
             )
             signals.append(signal)
 
-        return self._combiner.combine(signals)
+        return self._combiner.combine(signals, ndx_data=ndx_data)

@@ -136,15 +136,18 @@ class TestStrategyEngine:
             StrategyEngine(strats, combiner)
         assert "weights sum to" in caplog.text.lower()
 
-    def test_empty_strategies_produces_cash_allocation(
+    def test_empty_strategies_produces_vol_targeted_allocation(
         self, sample_ndx_data: pd.DataFrame
     ):
-        """No strategies means composite is 0 -> dead zone -> 100% cash."""
+        """No strategies means vol targeting from ndx_data only."""
         combiner = SignalCombiner()
         engine = StrategyEngine([], combiner)
         alloc = engine.evaluate(sample_ndx_data)
-        assert alloc.tqqq_pct == 0
+        # Vol targeting should produce some TQQQ based on ndx_data volatility
+        assert alloc.tqqq_pct >= 0
         assert alloc.sqqq_pct == 0
+        total = alloc.tqqq_pct + alloc.sqqq_pct + alloc.cash_pct
+        assert abs(float(total) - 1.0) <= 0.01
 
     def test_composite_score_propagated(self, sample_ndx_data: pd.DataFrame):
         strats = _build_fake_strategies([

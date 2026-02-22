@@ -8,7 +8,7 @@ secrets:
   provider: "env"
 
 alerts:
-  provider: "telegram"
+  provider: "noop"
 
 brokerages:
   primary: "alpaca"

@@ -1,9 +1,11 @@
-"""Unit tests for whitelight.strategy.combiner.SignalCombiner."""
+"""Unit tests for whitelight.strategy.combiner.SignalCombiner (vol-targeting)."""
 
 from __future__ import annotations
 
 from decimal import Decimal
 
+import numpy as np
+import pandas as pd
 import pytest
 
 from whitelight.models import SignalStrength, SubStrategySignal, TargetAllocation
@@ -20,13 +22,14 @@ def _sig(
     raw_score: float,
     weight: float = 0.15,
     signal: SignalStrength = SignalStrength.NEUTRAL,
+    metadata: dict | None = None,
 ) -> SubStrategySignal:
-    """Shorthand for creating a SubStrategySignal."""
     return SubStrategySignal(
         strategy_name=name,
         signal=signal,
         weight=weight,
         raw_score=raw_score,
+        metadata=metadata or {},
     )
 
 
@@ -38,118 +41,93 @@ def _make_signals(
     s5: float = 0.0,
     s6: float = 0.0,
     s7: float = 0.0,
+    vol20: float = 0.20,
+    above_200: bool = True,
 ) -> list[SubStrategySignal]:
-    """Create a full set of 7 signals with the given raw_scores.
-
-    Uses the default weights from the production config.
-    """
+    """Create a full set of 7 signals with the given raw_scores."""
     return [
         _sig("S1_PrimaryTrend", s1, 0.25),
         _sig("S2_IntermediateTrend", s2, 0.15),
         _sig("S3_ShortTermTrend", s3, 0.10),
-        _sig("S4_TrendStrength", s4, 0.10),
+        _sig("S4_TrendStrength", s4, 0.10, metadata={"above_200": above_200, "sma200": 100}),
         _sig("S5_MomentumVelocity", s5, 0.15),
         _sig("S6_MeanRevBollinger", s6, 0.15),
-        _sig("S7_VolatilityRegime", s7, 0.10),
+        _sig("S7_VolatilityRegime", s7, 0.10, metadata={"vol20": vol20, "vol60": 0.15}),
     ]
 
 
+def _make_ndx(n_days: int = 300, base: float = 20000.0, vol: float = 0.01) -> pd.DataFrame:
+    """Create a synthetic NDX DataFrame with controllable volatility."""
+    np.random.seed(42)
+    dates = pd.bdate_range(end="2026-02-20", periods=n_days)
+    returns = np.random.normal(0.0003, vol, n_days)
+    prices = base * np.cumprod(1 + returns)
+    return pd.DataFrame({
+        "date": dates,
+        "open": prices * 0.999,
+        "high": prices * 1.002,
+        "low": prices * 0.998,
+        "close": prices,
+        "volume": np.random.randint(1e8, 2e8, n_days),
+    })
+
+
 # ===========================================================================
-# Bull zone
+# Volatility Targeting (core logic)
 # ===========================================================================
 
 
-class TestBullZone:
-    """composite >= 0.1 --> TQQQ allocation, no SQQQ."""
+class TestVolTargeting:
+    """TQQQ weight = min(target_vol / realized_vol, 1.0)."""
 
-    def test_moderate_bull_produces_tqqq(self):
-        # All signals at +0.5 => composite = 0.5
-        signals = _make_signals(0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5)
+    def test_low_vol_full_tqqq(self):
+        """When vol20 < target_vol (20%), TQQQ should be 100%."""
+        signals = _make_signals(vol20=0.15)  # 15% vol < 20% target
         combiner = SignalCombiner()
         alloc = combiner.combine(signals)
-        assert alloc.tqqq_pct > 0
+        assert alloc.tqqq_pct == Decimal("1.0")
         assert alloc.sqqq_pct == 0
-        assert alloc.composite_score >= 0.1
+        assert alloc.cash_pct == Decimal("0")
 
-    def test_strong_bull_tqqq_allocation(self):
-        # All signals at +1.0 => composite = 1.0 => raw TQQQ = 1.0 * 1.20 = 1.20 -> capped 0.90
-        signals = _make_signals(1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0)
+    def test_matching_vol_full_tqqq(self):
+        """When vol20 == target_vol, TQQQ should be 100%."""
+        signals = _make_signals(vol20=0.20)
         combiner = SignalCombiner()
         alloc = combiner.combine(signals)
-        assert alloc.tqqq_pct == Decimal("0.90")  # Capped at 90%
-        assert alloc.sqqq_pct == 0
+        assert alloc.tqqq_pct == Decimal("1.0")
 
-    def test_tqqq_capped_at_max(self):
-        # Very strong composite should still be capped
-        signals = _make_signals(1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0)
+    def test_high_vol_reduces_tqqq(self):
+        """When vol20 > target_vol, TQQQ should be reduced proportionally."""
+        signals = _make_signals(vol20=0.40)  # 40% vol -> 20/40 = 50%
         combiner = SignalCombiner()
         alloc = combiner.combine(signals)
-        assert alloc.tqqq_pct <= Decimal("0.90")
+        assert alloc.tqqq_pct == Decimal("0.5")
+        assert alloc.cash_pct == Decimal("0.5")
 
-
-# ===========================================================================
-# Dead zone
-# ===========================================================================
-
-
-class TestDeadZone:
-    """composite in (-0.1, +0.1) --> 100% cash."""
-
-    def test_zero_composite_gives_cash(self):
-        signals = _make_signals(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+    def test_very_high_vol_minimal_tqqq(self):
+        """Extreme volatility should result in minimal TQQQ."""
+        signals = _make_signals(vol20=1.0)  # 100% vol -> 20/100 = 20%
         combiner = SignalCombiner()
         alloc = combiner.combine(signals)
-        assert alloc.tqqq_pct == 0
-        assert alloc.sqqq_pct == 0
-        assert alloc.cash_pct == Decimal("1.0")
+        assert alloc.tqqq_pct == Decimal("0.2")
+        assert alloc.cash_pct == Decimal("0.8")
 
-    def test_composite_just_below_bull_threshold(self):
-        # composite = 0.09 -> dead zone (threshold is 0.1)
-        # 0.25*0.36 = 0.09, rest 0 => composite = 0.09
-        signals = _make_signals(0.36, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+    def test_vol_scaling_from_ndx_data(self):
+        """Combiner should compute vol20 from ndx_data when provided."""
+        ndx = _make_ndx(n_days=300, vol=0.01)  # ~16% annualised
+        signals = _make_signals(vol20=0.50)  # metadata says 50% but ndx_data should win
         combiner = SignalCombiner()
-        alloc = combiner.combine(signals)
-        assert alloc.tqqq_pct == 0
-        assert alloc.sqqq_pct == 0
+        alloc = combiner.combine(signals, ndx_data=ndx)
+        # Should use ndx_data vol (~16%), not metadata vol (50%)
+        # At 16% vol -> 20/16 > 1.0 -> capped at 100%
+        assert alloc.tqqq_pct >= Decimal("0.9")  # near full
 
-    def test_composite_just_above_bear_threshold(self):
-        # composite = -0.09 -> dead zone
-        # 0.25 * (-0.36) = -0.09
-        signals = _make_signals(-0.36, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+    def test_vol_fallback_to_s7_metadata(self):
+        """When ndx_data is None, falls back to S7 metadata."""
+        signals = _make_signals(vol20=0.40)
         combiner = SignalCombiner()
-        alloc = combiner.combine(signals)
-        assert alloc.tqqq_pct == 0
-        assert alloc.sqqq_pct == 0
-
-
-# ===========================================================================
-# Bear zone
-# ===========================================================================
-
-
-class TestBearZone:
-    """composite <= -0.1 --> SQQQ allocation, no TQQQ."""
-
-    def test_bear_produces_sqqq(self):
-        signals = _make_signals(-0.5, -0.5, -0.5, -0.5, -0.5, -0.5, -0.5)
-        combiner = SignalCombiner()
-        alloc = combiner.combine(signals)
-        assert alloc.sqqq_pct > 0
-        assert alloc.tqqq_pct == 0
-        assert alloc.composite_score <= -0.1
-
-    def test_strong_bear_sqqq_allocation(self):
-        # All at -1.0 => composite = -1.0 => raw = 1.0 * 0.30 = 0.30 -> capped at 0.20
-        signals = _make_signals(-1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0)
-        combiner = SignalCombiner()
-        alloc = combiner.combine(signals)
-        assert alloc.sqqq_pct == Decimal("0.20")  # Capped at 20%
-
-    def test_sqqq_capped_at_20_percent(self):
-        signals = _make_signals(-1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0)
-        combiner = SignalCombiner()
-        alloc = combiner.combine(signals)
-        assert alloc.sqqq_pct <= Decimal("0.20")
+        alloc = combiner.combine(signals, ndx_data=None)
+        assert alloc.tqqq_pct == Decimal("0.5")  # 20/40
 
 
 # ===========================================================================
@@ -158,12 +136,9 @@ class TestBearZone:
 
 
 class TestAllocationsSumToOne:
-    @pytest.mark.parametrize(
-        "score",
-        [1.0, 0.5, 0.2, 0.1, 0.0, -0.05, -0.1, -0.5, -1.0],
-    )
-    def test_allocations_sum_to_one(self, score: float):
-        signals = _make_signals(score, score, score, score, score, score, score)
+    @pytest.mark.parametrize("vol20", [0.10, 0.15, 0.20, 0.30, 0.50, 0.80, 1.0])
+    def test_allocations_sum_to_one(self, vol20: float):
+        signals = _make_signals(vol20=vol20)
         combiner = SignalCombiner()
         alloc = combiner.combine(signals)
         total = alloc.tqqq_pct + alloc.sqqq_pct + alloc.cash_pct
@@ -171,81 +146,80 @@ class TestAllocationsSumToOne:
 
 
 # ===========================================================================
-# Override 1: Strong Bull Floor
+# SQQQ Sprint
 # ===========================================================================
 
 
-class TestStrongBullFloor:
-    """When all 4 trend strategies (S1-S4) have raw_score >= 0.8, TQQQ >= 50%."""
+class TestSQQQSprint:
+    """SQQQ sprint: 30% SQQQ during first 15 days below 200 SMA + vol > 25%."""
 
-    def test_floor_applied_when_all_trend_signals_high(self):
-        # S1-S4 at 0.9 (all >= 0.8), S5-S7 slightly negative but NOT triggering crisis
-        # S5 > -0.5 and S7 > -0.3 so crisis cap doesn't fire
-        signals = _make_signals(0.9, 0.9, 0.9, 0.9, -0.4, -0.3, -0.2)
-        # composite = 0.225+0.135+0.09+0.09 -0.06 -0.045 -0.02 = 0.415
-        # TQQQ raw = 0.415*1.20 = 0.498 < 0.50 -> floor applies
+    def test_sprint_activates_below_sma_high_vol(self):
+        """SQQQ sprint fires when below 200 SMA with high volatility."""
+        signals = _make_signals(vol20=0.35, above_200=False)
         combiner = SignalCombiner()
         alloc = combiner.combine(signals)
-        assert alloc.tqqq_pct >= Decimal("0.50")
+        assert alloc.sqqq_pct == Decimal("0.30")
+        assert alloc.tqqq_pct == 0
 
-    def test_floor_not_applied_when_one_trend_low(self):
-        # S1 at 0.7 (< 0.8) -> floor should NOT apply
-        signals = _make_signals(0.7, 0.9, 0.9, 0.9, -0.5, -0.3, -0.5)
+    def test_no_sprint_above_sma(self):
+        """No SQQQ sprint when above 200 SMA."""
+        signals = _make_signals(vol20=0.35, above_200=True)
         combiner = SignalCombiner()
         alloc = combiner.combine(signals)
-        # Floor is NOT forced because S1 < 0.8
-        # The allocation is determined by normal bull zone rules
-        assert alloc.tqqq_pct >= 0  # Valid allocation
+        assert alloc.sqqq_pct == 0
+        assert alloc.tqqq_pct > 0
 
-    def test_floor_override_sets_sqqq_to_zero(self):
-        """When strong bull floor applies, SQQQ should be 0."""
-        # Create a scenario where the floor forces TQQQ up
-        # S1-S4 all at 0.8 exactly, others slightly negative to pull composite down
-        # but NOT enough to trigger crisis (S5 > -0.5, S7 > -0.3)
-        signals = _make_signals(0.8, 0.8, 0.8, 0.8, -0.4, -0.4, -0.2)
-        # composite = 0.20+0.12+0.08+0.08 -0.06 -0.06 -0.02 = 0.34
-        # TQQQ raw = 0.34 * 1.20 = 0.408 -> which is < 0.50 -> floor applies
+    def test_no_sprint_low_vol(self):
+        """No SQQQ sprint when vol < 25% even if below SMA."""
+        signals = _make_signals(vol20=0.20, above_200=False)
         combiner = SignalCombiner()
         alloc = combiner.combine(signals)
-        assert alloc.tqqq_pct >= Decimal("0.50")
+        assert alloc.sqqq_pct == 0
+        # Vol targeting still produces TQQQ (20/20 = 100%)
+        assert alloc.tqqq_pct == Decimal("1.0")
+
+    def test_sprint_expires_after_max_days(self):
+        """SQQQ sprint should stop after SQQQ_SPRINT_MAX_DAYS."""
+        combiner = SignalCombiner()
+
+        # Simulate 16 consecutive days below SMA with high vol
+        for day in range(16):
+            signals = _make_signals(vol20=0.35, above_200=False)
+            alloc = combiner.combine(signals)
+
+        # Day 16: days_below_sma == 16 > 15, sprint should be off
+        assert alloc.sqqq_pct == 0
+        # TQQQ is 0 because no-flip rule fires (previous had SQQQ, now vol-target
+        # wants TQQQ). That's correct behavior -- it passes through cash first.
+        assert alloc.cash_pct == Decimal("1.0")
+
+    def test_sprint_resets_after_recovery(self):
+        """Days counter resets when NDX goes back above SMA."""
+        combiner = SignalCombiner()
+
+        # 5 days below -> sprint active
+        for _ in range(5):
+            alloc = combiner.combine(_make_signals(vol20=0.35, above_200=False))
+        assert alloc.sqqq_pct == Decimal("0.30")
+
+        # Go above SMA for 1 day -> resets
+        alloc = combiner.combine(_make_signals(vol20=0.35, above_200=True))
+        assert alloc.sqqq_pct == 0
+
+        # Back below -> day count restarts at 1
+        alloc = combiner.combine(_make_signals(vol20=0.35, above_200=False))
+        assert alloc.sqqq_pct == Decimal("0.30")  # sprint active again
+
+    def test_sprint_can_be_disabled(self):
+        combiner = SignalCombiner()
+        combiner.SQQQ_SPRINT_ENABLED = False
+        signals = _make_signals(vol20=0.35, above_200=False)
+        alloc = combiner.combine(signals)
         assert alloc.sqqq_pct == 0
 
 
 # ===========================================================================
-# Override 2: Crisis Mode Cap
-# ===========================================================================
-
-
-class TestCrisisModeCap:
-    """If S5 <= -0.5 AND S7 <= -0.3, TQQQ is hard-capped at 20%."""
-
-    def test_crisis_caps_tqqq(self):
-        # Strong bull signals from S1-S4, but S5/S7 trigger crisis
-        signals = _make_signals(1.0, 1.0, 1.0, 1.0, -0.6, 0.5, -0.4)
-        # composite = 0.25 + 0.15 + 0.10 + 0.10 - 0.09 + 0.075 - 0.04 = 0.545
-        # Normal TQQQ = min(0.545 * 1.20, 0.90) = min(0.654, 0.90) = 0.654
-        # Crisis: S5=-0.6 <= -0.5 AND S7=-0.4 <= -0.3 -> cap at 0.20
-        combiner = SignalCombiner()
-        alloc = combiner.combine(signals)
-        assert alloc.tqqq_pct <= Decimal("0.20")
-
-    def test_no_crisis_when_s5_above_threshold(self):
-        signals = _make_signals(1.0, 1.0, 1.0, 1.0, -0.4, 0.5, -0.4)
-        # S5 = -0.4 > -0.5, so no crisis
-        combiner = SignalCombiner()
-        alloc = combiner.combine(signals)
-        assert alloc.tqqq_pct > Decimal("0.20")
-
-    def test_no_crisis_when_s7_above_threshold(self):
-        signals = _make_signals(1.0, 1.0, 1.0, 1.0, -0.6, 0.5, -0.2)
-        # S7 = -0.2 > -0.3, so no crisis
-        combiner = SignalCombiner()
-        alloc = combiner.combine(signals)
-        assert alloc.tqqq_pct > Decimal("0.20")
-
-
-# ===========================================================================
-# Override 3: No Direct TQQQ <-> SQQQ Flip
+# No Direct TQQQ <-> SQQQ Flip
 # ===========================================================================
 
 
@@ -255,15 +229,13 @@ class TestNoDirectFlip:
     def test_tqqq_to_sqqq_forces_cash(self):
         combiner = SignalCombiner()
 
-        # First call: bull allocation (TQQQ > 0)
-        bull_signals = _make_signals(1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0)
-        alloc1 = combiner.combine(bull_signals)
+        # Day 1: low vol, above SMA -> TQQQ
+        alloc1 = combiner.combine(_make_signals(vol20=0.15, above_200=True))
         assert alloc1.tqqq_pct > 0
 
-        # Second call: bear allocation would normally give SQQQ > 0
-        bear_signals = _make_signals(-1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0)
-        alloc2 = combiner.combine(bear_signals)
-        # Should force 100% cash instead of flipping
+        # Day 2: high vol, below SMA -> would be SQQQ sprint
+        alloc2 = combiner.combine(_make_signals(vol20=0.35, above_200=False))
+        # Should force cash instead of flipping
         assert alloc2.tqqq_pct == 0
         assert alloc2.sqqq_pct == 0
         assert alloc2.cash_pct == Decimal("1.0")
@@ -271,69 +243,50 @@ class TestNoDirectFlip:
     def test_sqqq_to_tqqq_forces_cash(self):
         combiner = SignalCombiner()
 
-        # First call: bear allocation (SQQQ > 0)
-        bear_signals = _make_signals(-1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0)
-        alloc1 = combiner.combine(bear_signals)
+        # Day 1: SQQQ sprint active
+        alloc1 = combiner.combine(_make_signals(vol20=0.35, above_200=False))
         assert alloc1.sqqq_pct > 0
 
-        # Second call: bull allocation would normally give TQQQ > 0
-        bull_signals = _make_signals(1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0)
-        alloc2 = combiner.combine(bull_signals)
-        # Should force 100% cash instead of flipping
+        # Day 2: back above SMA -> would be TQQQ
+        alloc2 = combiner.combine(_make_signals(vol20=0.15, above_200=True))
+        # Should force cash
         assert alloc2.tqqq_pct == 0
         assert alloc2.sqqq_pct == 0
         assert alloc2.cash_pct == Decimal("1.0")
 
     def test_cash_to_tqqq_is_allowed(self):
-        """Going from cash to TQQQ is not a flip and should be allowed."""
         combiner = SignalCombiner()
 
-        # First call: dead zone (all cash)
-        cash_signals = _make_signals(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
-        alloc1 = combiner.combine(cash_signals)
-        assert alloc1.tqqq_pct == 0
-        assert alloc1.sqqq_pct == 0
+        # Day 1: SQQQ sprint
+        alloc1 = combiner.combine(_make_signals(vol20=0.35, above_200=False))
+        assert alloc1.sqqq_pct > 0
 
-        # Second call: bull signal -> should allocate TQQQ normally
-        bull_signals = _make_signals(1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0)
-        alloc2 = combiner.combine(bull_signals)
-        assert alloc2.tqqq_pct > 0
+        # Day 2: above SMA -> would be TQQQ, but no-flip forces cash
+        alloc2 = combiner.combine(_make_signals(vol20=0.15, above_200=True))
+        assert alloc2.cash_pct == Decimal("1.0")
 
-    def test_cash_to_sqqq_is_allowed(self):
-        """Going from cash to SQQQ is not a flip and should be allowed."""
+        # Day 3: previous was cash, TQQQ should now be allowed
+        alloc3 = combiner.combine(_make_signals(vol20=0.15, above_200=True))
+        assert alloc3.tqqq_pct > 0
+
+    def test_after_forced_cash_sqqq_allowed(self):
         combiner = SignalCombiner()
 
-        # First call: dead zone (all cash)
-        cash_signals = _make_signals(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
-        alloc1 = combiner.combine(cash_signals)
-        assert alloc1.tqqq_pct == 0
-        assert alloc1.sqqq_pct == 0
-
-        # Second call: bear signal -> should allocate SQQQ normally
-        bear_signals = _make_signals(-1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0)
-        alloc2 = combiner.combine(bear_signals)
-        assert alloc2.sqqq_pct > 0
-
-    def test_after_forced_cash_can_enter_tqqq(self):
-        """After a forced-cash day, the next signal can allocate normally."""
-        combiner = SignalCombiner()
-
-        # Day 1: bull (TQQQ)
-        alloc1 = combiner.combine(_make_signals(1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0))
+        # Day 1: TQQQ
+        alloc1 = combiner.combine(_make_signals(vol20=0.15, above_200=True))
         assert alloc1.tqqq_pct > 0
 
-        # Day 2: bear -> forced cash
-        alloc2 = combiner.combine(_make_signals(-1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0))
-        assert alloc2.tqqq_pct == 0
-        assert alloc2.sqqq_pct == 0
+        # Day 2: would be SQQQ -> forced cash
+        alloc2 = combiner.combine(_make_signals(vol20=0.35, above_200=False))
+        assert alloc2.cash_pct == Decimal("1.0")
 
-        # Day 3: bear again -> now previous was cash, so SQQQ is allowed
-        alloc3 = combiner.combine(_make_signals(-1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0))
+        # Day 3: SQQQ now allowed (previous was cash)
+        alloc3 = combiner.combine(_make_signals(vol20=0.35, above_200=False))
         assert alloc3.sqqq_pct > 0
 
 
 # ===========================================================================
-# Composite score correctness
+# Composite score still computed for reporting
 # ===========================================================================
 
 
@@ -341,8 +294,7 @@ class TestCompositeScore:
     def test_composite_score_calculation(self):
         signals = _make_signals(0.5, 0.3, 0.1, -0.2, 0.4, -0.1, 0.0)
         # composite = 0.25*0.5 + 0.15*0.3 + 0.10*0.1 + 0.10*(-0.2)
-        #           + 0.15*0.4 + 0.15*(-0.1) + 0.10*0.0
-        # = 0.125 + 0.045 + 0.01 - 0.02 + 0.06 - 0.015 + 0.0 = 0.205
+        #           + 0.15*0.4 + 0.15*(-0.1) + 0.10*0.0 = 0.205
         combiner = SignalCombiner()
         alloc = combiner.combine(signals)
         assert alloc.composite_score == pytest.approx(0.205, abs=1e-4)
