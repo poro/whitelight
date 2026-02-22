@@ -22,6 +22,7 @@ dependencies = [
     "structlog>=23.2",
     "tenacity>=8.2",
     "boto3>=1.33",
+    "yfinance>=0.2.31",
 ]
 
 [project.optional-dependencies]

@@ -36,7 +36,11 @@ def rsi(series: pd.Series, period: int) -> pd.Series:
     avg_loss = loss.ewm(alpha=1.0 / period, min_periods=period, adjust=False).mean()
 
     rs = avg_gain / avg_loss.replace(0, np.nan)
-    return 100.0 - (100.0 / (1.0 + rs))
+    result = 100.0 - (100.0 / (1.0 + rs))
+    # When avg_loss is 0 (all gains), RS is NaN → RSI should be 100
+    # When avg_gain is 0 (all losses), RS is 0 → RSI is 0 (correct already)
+    result = result.fillna(100.0).where(avg_gain.notna(), other=np.nan)
+    return result
 
 
 def bollinger_bands(

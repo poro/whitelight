@@ -1,7 +1,7 @@
 # Product Requirements Document (PRD): "White Light" Automated Trading System
 
-**Version:** 1.3
-**Date:** February 21, 2026
+**Version:** 1.4
+**Date:** February 22, 2026
 **Author:** Mark Ollila
 **Status:** Draft
 **Classification:** Confidential
@@ -76,7 +76,7 @@ The system operates as a low-frequency position-trading engine. It averages 1 to
 |-----------|--------------|
 | Hosting | AWS EC2 instance (t3.small or t3.medium), us-east-1 region — OR — Local Linux server |
 | Scheduling | AWS EventBridge + Lambda trigger — OR — cron job (local) |
-| Data Provider | Polygon.io API — end-of-day and real-time market pricing |
+| Data Provider | Polygon.io API (production) / Yahoo Finance via yfinance (backtesting, free) |
 | Primary Brokerage | Alpaca (REST API — commission-free, purpose-built for algo trading) |
 | Secondary Brokerage | Interactive Brokers (TWS API — institutional-grade, global reach) |
 | Secrets Management | AWS Secrets Manager — OR — `pass` (GPG-encrypted, local) |
@@ -207,6 +207,44 @@ The strategy engine is the core intelligence of the system. It runs 7 concurrent
 - Example: If momentum readings progress from 40 to 30 to 20, the trend is decelerating (bearish).
 - If deceleration is detected, the system triggers logic to trim long positions, take profits, or rotate into SQQQ.
 
+#### B.1 Sub-Strategy Specifications
+
+The 7 sub-strategies are split into two groups: trend-following (60% total weight) and mean-reversion (40% total weight). Each strategy produces a continuous `raw_score` in [-1.0, +1.0] and a discrete signal strength. All strategies are stateless: signals are derived entirely from the NDX price history passed in.
+
+| # | Strategy | Type | Weight | Key Indicators | Description |
+|---|----------|------|--------|----------------|-------------|
+| S1 | Primary Trend | Trend | 0.25 | NDX vs 50/250 SMA | Longest-term regime detector. Uses hysteresis (0.5% threshold, 2-day confirmation) to prevent whipsaw at crossovers. Above both = +1.0 (STRONG_BULL), below both = -0.5 (STRONG_BEAR). |
+| S2 | Intermediate Trend | Trend | 0.15 | 20/100 SMA crossover | Captures intermediate swings. Checks price vs 20 SMA and 20 SMA vs 100 SMA alignment. Four states: +1.0 / +0.3 / 0.0 / -0.5. |
+| S3 | Short-Term Trend | Trend | 0.10 | 10/30 SMA | Most responsive trend signal. Checks SMA crossover direction and price position relative to 10 SMA. Four states: +1.0 / +0.5 / 0.0 / -0.3. |
+| S4 | Trend Strength | Trend | 0.10 | 60-day regression slope, z-scored vs 252-day history | Measures trend quality rather than direction. Cross-references with 200 SMA filter. Five states from +1.0 to -0.5. |
+| S5 | Momentum Velocity | Mean Rev | 0.15 | 14-day ROC smoothed with 3-day SMA + first derivative | Directly implements the PRD "acceleration/deceleration" logic. Accelerating bull = +1.0, decelerating bear = -0.7. 5-day ROC < -5% triggers -0.2 crash penalty. |
+| S6 | Bollinger Mean Reversion | Mean Rev | 0.15 | 20-day Bollinger %B + 200 SMA filter | Buys dips in uptrends (%B < 0.2 bullish = +1.0), fades rallies in downtrends (%B > 0.95 bearish = -0.3). Extreme crashes (%B < 0.05) trigger tactical bounce regardless of trend. |
+| S7 | Volatility Regime | Mean Rev | 0.10 | 20-day vs 60-day realized volatility ratio + 100 SMA | Reduces exposure when vol spikes (protects against 3x leverage decay). vol_ratio > 2.0 = -0.3 override. Calm bull (vol_ratio < 0.8, bullish) = +1.0. |
+
+**Shared Indicators Library:**
+- `sma(series, period)` — Simple Moving Average
+- `roc(series, period)` — Rate of Change (percentage)
+- `rsi(series, period)` — Relative Strength Index (0-100)
+- `bollinger_bands(series, period, std_mult)` — Returns (upper, lower, %B)
+- `realized_volatility(series, period)` — Annualized std of log returns
+- `linear_regression_slope(series, period)` — Rolling OLS slope
+- `zscore(series, period)` — Rolling z-score normalization
+
+#### B.2 Signal Combiner Rules
+
+The combiner translates weighted sub-strategy signals into a target allocation:
+
+**Base Allocation:**
+- **Composite score** = sum(weight_i * raw_score_i) across all 7 strategies
+- Score >= +0.2: TQQQ allocation = score * 0.60, capped at 50%
+- Score in (-0.1, +0.2): 100% cash (dead zone — no conviction)
+- Score <= -0.1: SQQQ allocation = |score| * 0.40, capped at 30%
+
+**Override Rules:**
+1. **Strong bull floor:** If all 4 trend strategies (S1-S4) have raw_score >= +0.8, TQQQ allocation is floored at 30%. Rationale: when all trend timeframes align strongly bullish, don't fight the trend even if mean-reversion signals are cautious.
+2. **Crisis mode cap:** If S5 (momentum) raw_score <= -0.5 AND S7 (volatility) raw_score <= -0.3, TQQQ is hard-capped at 10%. Rationale: when momentum is collapsing and volatility is spiking, 3x leverage decay can be devastating — protect capital.
+3. **No direct flip:** The system never goes directly from TQQQ to SQQQ or vice versa. If the previous allocation had TQQQ > 0 and the new allocation would have SQQQ > 0 (or reverse), force 100% cash for one day. Rationale: prevents overtrading during regime transitions and gives the market a day to confirm the new direction.
+
 **Target Output**
 
 At the conclusion of all sub-strategy calculations, the engine outputs an exact target portfolio allocation for the upcoming overnight hold. For example:
@@ -243,9 +281,9 @@ If a broker rejects an order (e.g., due to extreme market volatility, insufficie
 
 ### 5.2 Data Source Fallbacks
 
-- **Primary source:** Polygon.io API (real-time and end-of-day data).
+- **Primary source:** Polygon.io API (real-time and end-of-day data). Requires a paid plan ($29+/mo) for index data (NDX) and full history.
 - **Fallback:** Local historical cache (allows the system to operate using cached data if the API is unavailable).
-- **Secondary fallback:** Integration with a secondary data provider (to be determined) for seamless failover.
+- **Secondary source:** Yahoo Finance via `yfinance` library (free, no API key required). Provides daily OHLCV for NDX (`^NDX`), TQQQ, and SQQQ. Suitable for backtesting and development but not recommended for production trading due to rate limits and occasional data gaps.
 
 ### 5.3 Auto-Recovery
 
@@ -330,9 +368,82 @@ All sensitive credentials must be stored in a secrets management system. **No AP
 
 ---
 
-## 8. Future Enhancements (Phase 2)
+## 8. Backtesting & Validation
 
-### 8.1 Signal Syndication via Collective2
+### 8.1 Backtesting Framework
+
+The system includes a built-in backtesting engine that replays historical NDX/TQQQ/SQQQ data through the full strategy pipeline day-by-day. This enables validation of strategy logic against known historical performance before deploying to live trading.
+
+**How it works:**
+
+1. Load historical OHLCV data for NDX, TQQQ, and SQQQ (from Parquet cache, Polygon.io, or Yahoo Finance).
+2. For each trading day after a 260-day warmup period (required for the 250-day SMA lookback):
+   - Run the full 7-strategy engine on NDX data up to that day.
+   - Get the target allocation from the combiner (including all override rules).
+   - Simulate execution at closing prices (market orders, same as live system).
+   - Track portfolio value, positions, cash, and trades.
+3. Compute performance metrics and compare against Collective2 benchmark returns.
+
+**Data sources for backtesting:**
+
+| Source | Cost | API Key Required | NDX History | Best For |
+|--------|------|-----------------|-------------|----------|
+| Yahoo Finance (`yfinance`) | Free | No | ~2000-present | Development, quick validation |
+| Polygon.io | $29+/mo | Yes | 1985-present | Full historical backtest, production |
+| Local Parquet cache | Free | No (pre-seeded) | Depends on seed | Offline development |
+
+**Usage:**
+
+```bash
+# Quick backtest with free Yahoo Finance data (no API key needed)
+python scripts/backtest.py --source yfinance
+
+# Full backtest from C2 inception date
+python scripts/backtest.py --start 2022-07-23 --source yfinance
+
+# Backtest with Polygon data (requires API key)
+python scripts/backtest.py --source polygon --api-key YOUR_KEY
+
+# Compare results against Collective2 monthly returns
+python scripts/backtest.py --compare-c2
+```
+
+### 8.2 Performance Metrics
+
+The backtesting framework calculates the following metrics for comparison against Collective2 benchmarks:
+
+| Metric | Description | C2 Benchmark |
+|--------|-------------|--------------|
+| Annual Return (CAGR) | Compound annual growth rate | +26.5% |
+| Max Drawdown | Largest peak-to-valley decline | -37.58% |
+| Sharpe Ratio | Risk-adjusted return (annualized) | — |
+| Sortino Ratio | Downside risk-adjusted return | — |
+| Calmar Ratio | CAGR / max drawdown | — |
+| Win Rate | Winning trades / total trades | 40.7% |
+| Profit Factor | Gross profits / gross losses | — |
+| Avg Trade Duration | Mean days per trade | 14.2 days |
+| Total Trades | Number of completed round-trip trades | 81 (over 1,309 days) |
+| Monthly Returns | Month-by-month return table | See Section 1.2 |
+
+### 8.3 Validation Targets
+
+The backtested strategy should approximate (not exactly match) the Collective2 performance, accounting for:
+
+- **Execution differences:** The backtest simulates market orders at closing prices, while live C2 trades may have executed at slightly different intraday prices.
+- **Strategy evolution:** The discretionary strategy on C2 may have evolved over time; the automated system implements the rules as of v1.4 of this PRD.
+- **No-flip rule:** The automated system enforces a mandatory cash day between TQQQ and SQQQ positions, which the discretionary strategy may not have always followed.
+
+A successful validation should show:
+- Annual return within +/- 15% of C2 benchmark
+- Max drawdown within +/- 10% of C2 benchmark
+- Similar trade frequency (within 2x of C2's ~1 trade per 16 days)
+- Monthly return correlation > 0.7 with C2 monthly returns during the overlapping period (July 2022 - present)
+
+---
+
+## 9. Future Enhancements (Phase 2)
+
+### 9.1 Signal Syndication via Collective2
 
 The strategy is already listed on Collective2 as "Whitelight" (ID: K6Q9FDJ8A) with $1.2M in follower live capital and a $50/month subscription price. Phase 2 will build a direct API integration to automate signal broadcasting from the White Light engine to Collective2, eliminating any manual signal entry.
 
@@ -340,11 +451,11 @@ The strategy is already listed on Collective2 as "Whitelight" (ID: K6Q9FDJ8A) wi
 - SMS-based trade alerts.
 - Email-based trade notifications.
 
-### 8.2 Additional Brokerage Integrations
+### 9.2 Additional Brokerage Integrations
 
 Extend API connectivity to E-Trade and potentially Fidelity (if/when a public API becomes available) to serve a broader user base and provide additional redundancy.
 
-### 8.3 Enhanced Risk Controls
+### 9.3 Enhanced Risk Controls
 
 - **Emergency stop (circuit breaker):** Automatic halt of all trading activity if portfolio drawdown exceeds a configurable threshold. Note: the historical max drawdown is -37.58%, so a circuit breaker at -40% to -45% would allow normal operation while catching catastrophic scenarios.
 - **Volatility filters:** Additional logic to reduce position sizing during periods of extreme market turbulence.
@@ -352,7 +463,7 @@ Extend API connectivity to E-Trade and potentially Fidelity (if/when a public AP
 
 ---
 
-## 9. Glossary
+## 10. Glossary
 
 | Term | Definition |
 |------|-----------|
@@ -366,6 +477,15 @@ Extend API connectivity to E-Trade and potentially Fidelity (if/when a public AP
 | Alpha | Excess return relative to the benchmark (0.0415 = strategy outperforms benchmark by ~4.15% annually on a risk-adjusted basis) |
 | Beta | Sensitivity to market movements (0.7998 = strategy captures ~80% of market moves, indicating some downside protection) |
 | Max Drawdown | Largest peak-to-valley decline in portfolio value (-37.58% for this strategy) |
+| Sharpe Ratio | Annualized risk-adjusted return: (return - risk_free_rate) / volatility |
+| Sortino Ratio | Like Sharpe but only penalizes downside volatility (more relevant for asymmetric return profiles) |
+| Calmar Ratio | CAGR divided by max drawdown; measures return per unit of drawdown risk |
+| Profit Factor | Gross profits divided by gross losses; values > 1.0 indicate a profitable system |
+| CAGR | Compound Annual Growth Rate — smoothed annualized return over a multi-year period |
+| Hysteresis | A threshold band that prevents signal oscillation near a crossover point; requires price to exceed the band for multiple days before confirming a regime change |
+| Bollinger %B | Normalized position within Bollinger Bands: (price - lower) / (upper - lower); values near 0 = oversold, near 1 = overbought |
+| ROC | Rate of Change — percentage change over N periods; used to measure momentum velocity |
+| Parquet | Columnar file format optimized for analytical queries; 10-100x faster than CSV for time-series data |
 
 ---
 
