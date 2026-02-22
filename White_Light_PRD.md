@@ -1,6 +1,6 @@
 # Product Requirements Document (PRD): "White Light" Automated Trading System
 
-**Version:** 1.4
+**Version:** 1.5
 **Date:** February 22, 2026
 **Author:** Mark Ollila
 **Status:** Draft
@@ -13,7 +13,7 @@
 
 The "White Light" system is a fully automated, systematic trading engine designed to execute a hands-free position-trading strategy. Built for professionals with full-time jobs, the system removes emotional and discretionary decision-making by programmatically evaluating market regimes and executing trades without human intervention.
 
-The strategy strictly trades the NASDAQ 100 via triple-leveraged ETFs. The system operates on a low-frequency basis, typically executing 1 to 2 trades per week, with core positions potentially held for months or years depending on the prevailing trend.
+The strategy trades the NASDAQ 100 via triple-leveraged ETFs and a T-bill bond ETF for idle cash. The system operates on a low-frequency basis, typically executing 1 to 2 trades per week, with core positions potentially held for months or years depending on the prevailing trend.
 
 ### 1.1 Verified Performance (Collective2)
 
@@ -53,10 +53,11 @@ The strategy has been tracked on Collective2 (an independent third-party platfor
 
 ### 2.1 Traded Instruments
 
-The system exclusively trades two instruments:
+The system trades three instruments:
 
 - **TQQQ** (ProShares UltraPro QQQ) — 3x Long NASDAQ 100 exposure for bullish positions.
-- **SQQQ** (ProShares UltraPro Short QQQ) — 3x Short NASDAQ 100 exposure for bearish or defensive positions.
+- **SQQQ** (ProShares UltraPro Short QQQ) — 3x Short NASDAQ 100 exposure, used only during crash sprints (first 15 days of a bear regime).
+- **BIL** (SPDR Bloomberg 1-3 Month T-Bill ETF) — Safe haven for idle capital, earning ~5% risk-free yield instead of leaving cash uninvested in the brokerage account.
 
 The system does not trade individual stocks, options, futures, or any other asset class.
 
@@ -74,29 +75,29 @@ The system operates as a low-frequency position-trading engine. It averages 1 to
 
 | Component | Specification |
 |-----------|--------------|
-| Hosting | AWS EC2 instance (t3.small or t3.medium), us-east-1 region — OR — Local Linux server |
+| Hosting | AWS EC2 instance (t3.small or t3.medium), us-east-1 region — OR — Local Linux/macOS server |
 | Scheduling | AWS EventBridge + Lambda trigger — OR — cron job (local) |
-| Data Provider | Polygon.io API (production) / Yahoo Finance via yfinance (backtesting, free) |
-| Primary Brokerage | Alpaca (REST API — commission-free, purpose-built for algo trading) |
-| Secondary Brokerage | Interactive Brokers (TWS API — institutional-grade, global reach) |
-| Secrets Management | AWS Secrets Manager — OR — `pass` (GPG-encrypted, local) |
+| Data Provider | Massive API (primary, Polygon-compatible) / Polygon.io (fallback) / Yahoo Finance via yfinance (backtesting, free) |
+| Brokerage | Alpaca (REST API — commission-free, purpose-built for algo trading) |
+| Secrets Management | AWS Secrets Manager — OR — `pass` (GPG-encrypted, local) — OR — environment variables |
 | Monitoring | AWS CloudWatch — OR — systemd + logrotate (local) |
-| Alerts | AWS SNS — OR — Telegram Bot / Pushover (local) |
+| Alerts | Telegram Bot / Pushover / AWS SNS / Ntfy.sh |
 | Networking | VPC with private subnet (AWS) — OR — UFW firewall (local) |
 
-The system is designed around a serverless-adjacent model: the cloud VM is only running during the critical trading window (approximately 15-20 minutes per day), minimizing infrastructure costs while ensuring the system is active when it matters. Alternatively, the system can run on a local Linux server with near-zero infrastructure cost.
+The system is designed around a serverless-adjacent model: the cloud VM is only running during the critical trading window (approximately 15-20 minutes per day), minimizing infrastructure costs while ensuring the system is active when it matters. Alternatively, the system can run on a local server with near-zero infrastructure cost.
 
-### 3.1 Why Alpaca + Interactive Brokers
+### 3.1 Why Alpaca
 
-The system uses a dual-brokerage architecture for redundancy and flexibility:
+Alpaca serves as the sole execution venue. It offers a modern REST API purpose-built for algorithmic trading, commission-free US equity/ETF trades, and excellent developer documentation. Alpaca is ideal for rapid development and low-friction automation. Key advantages:
 
-- **Alpaca** serves as the primary execution venue. It offers a modern REST API purpose-built for algorithmic trading, commission-free US equity/ETF trades, and excellent developer documentation. Alpaca is ideal for rapid development and low-friction automation.
-- **Interactive Brokers (IBKR)** serves as the secondary execution venue and capital custodian. IBKR is one of the most well-capitalized brokerages in the world, offers the battle-tested TWS API (Python, Java, C++), and provides SIPC protection. IBKR Lite offers commission-free US stock/ETF trades; IBKR Pro charges $0.005/share (min $1) with access to superior order routing.
-- **Failover logic:** If Alpaca's API is unreachable or rejects orders during the execution window, the system automatically falls back to IBKR for order routing. This ensures trades are placed even if one brokerage experiences downtime.
+- **Paper trading:** Free paper trading environment for testing the full pipeline without risking real capital.
+- **REST API + Python SDK:** The `alpaca-py` library provides typed access to account info, positions, and order submission.
+- **No minimum account size:** Suitable for accounts of any size.
+- **Commission-free:** No per-trade costs for US equities and ETFs.
 
 ### 3.2 Option A: AWS Cloud Deployment
 
-**Region:** us-east-1 (N. Virginia) — lowest latency to US equity exchanges and Polygon.io data centers.
+**Region:** us-east-1 (N. Virginia) — lowest latency to US equity exchanges and data provider servers.
 
 **Instance type:** t3.small (2 vCPUs, 2 GiB RAM) is sufficient for the strategy engine's computational needs. The workload is light: downloading a few hundred KB of price data, computing moving averages, and placing a handful of API calls.
 
@@ -106,33 +107,30 @@ The system uses a dual-brokerage architecture for redundancy and flexibility:
 
 **Networking:** The EC2 instance runs inside a VPC with a private subnet. A NAT Gateway provides outbound internet access for API calls. Security Groups restrict all inbound traffic except SSH from a whitelisted IP (for emergency access).
 
-### 3.3 Option B: Local Linux Server Deployment
+### 3.3 Option B: Local Server Deployment
 
-The system can alternatively be deployed on a personal Linux server (physical or virtual) running on your home or office network. This eliminates nearly all AWS infrastructure costs while maintaining the same trading logic and brokerage integrations.
+The system can alternatively be deployed on a personal server (Linux or macOS) running on your home or office network. This eliminates nearly all AWS infrastructure costs while maintaining the same trading logic and brokerage integration.
 
-**Minimum hardware requirements:** The computational workload is extremely light. Any machine with 1+ CPU cores, 1 GB RAM, and a few GB of disk space is more than sufficient. A Raspberry Pi 4, an old laptop, or a low-end Intel NUC would all work. The server must be running a modern Linux distribution (Ubuntu 22.04+, Debian 12+, or similar).
+**Minimum hardware requirements:** The computational workload is extremely light. Any machine with 1+ CPU cores, 1 GB RAM, and a few GB of disk space is more than sufficient. A Raspberry Pi 4, an old laptop, or a low-end Intel NUC would all work.
 
 **Scheduling:** Replace AWS EventBridge with a standard cron job. The cron entry fires at 3:40 PM ET each trading day and launches the trading pipeline script. Example: `40 15 * * 1-5 /opt/whitelight/run.sh` (adjust for your timezone). A helper script should check a market holiday calendar and skip execution on non-trading days.
-
-**IB Gateway:** Installs directly on the Linux server. Runs as a background process or systemd service. A cron job restarts it daily before market hours to maintain session freshness.
 
 **Secrets management (local):** Replace AWS Secrets Manager with one of the following options:
 
 | Option | Complexity | Security Level | Notes |
 |--------|-----------|---------------|-------|
+| Environment variables (`.env`) | Low | Moderate | Simplest; loaded at runtime via Pydantic Settings |
 | `pass` (GPG-encrypted store) | Low | High | Standard Linux password manager; GPG-encrypted at rest; CLI-friendly |
 | HashiCorp Vault (dev mode) | Medium | Very High | Full-featured secrets engine; overkill for a single-user system but future-proof |
 | GPG-encrypted `.env` file | Low | Moderate | Simple approach; script decrypts at runtime, loads into memory, shreds plaintext |
-| Linux keyring (`secret-tool`) | Low | Moderate | Uses the system's secure keyring; good for desktop Linux setups |
 
-**Recommended approach:** Use `pass` (the standard Unix password manager). It stores each secret as a GPG-encrypted file. The trading script calls `pass show whitelight/alpaca-key` at runtime to retrieve credentials, which are loaded into memory and never written to disk in plaintext.
+**Recommended approach for development:** Use environment variables via a `.env` file (loaded by the config system). For production, use `pass` (the standard Unix password manager). The trading script calls `pass show whitelight/alpaca-key` at runtime to retrieve credentials, which are loaded into memory and never written to disk in plaintext.
 
 **Alerts (local):** Replace AWS SNS with a free self-hosted alternative:
 
 - **Telegram Bot API ($0):** Create a private Telegram bot; the trading script sends HTTP POST requests to the Telegram API to push alerts to your phone. No server infrastructure required.
 - **Pushover ($5 one-time):** A mobile app with a simple REST API for push notifications. One-time purchase, no subscription.
 - **Ntfy.sh ($0):** Open-source push notification service; self-hosted or use the free public server.
-- **Email via SMTP ($0):** Send alerts through Gmail or any SMTP provider as a fallback.
 
 **Logging (local):** Use `systemd journal` or rotate logs to `/var/log/whitelight/`. Implement log rotation via `logrotate` to prevent disk fill. For long-term retention, optionally sync compressed logs to a cloud backup (S3, Backblaze B2) weekly.
 
@@ -141,14 +139,13 @@ The system can alternatively be deployed on a personal Linux server (physical or
 **Network security (local):**
 
 - **Firewall:** Configure UFW or iptables to deny all inbound traffic except SSH from trusted IPs. The trading bot only makes outbound HTTPS connections.
-- **IB Gateway ports:** Bind to `127.0.0.1` only (localhost). Never expose to the network.
 - **Router-level:** Disable UPnP, use a strong WPA3 Wi-Fi password, and consider placing the server on a separate VLAN or DMZ if your router supports it.
 - **SSH hardening:** Key-only authentication, Fail2Ban, disable root login — same as the AWS approach.
 
 **Reliability tradeoffs vs. AWS:**
 
-| Factor | AWS EC2 | Local Linux Server |
-|--------|---------|--------------------|
+| Factor | AWS EC2 | Local Server |
+|--------|---------|--------------|
 | Uptime guarantee | 99.99% SLA | Depends on your power + internet |
 | Power outage protection | Built-in | Requires UPS ($50-150 one-time) |
 | Internet redundancy | Multiple backbone providers | Single ISP; consider cellular failover ($10-20/mo) |
@@ -161,13 +158,13 @@ The system can alternatively be deployed on a personal Linux server (physical or
 
 ### 3.4 Deployment Comparison Summary
 
-| | AWS Cloud | Local Linux Server |
-|---|-----------|-------------------|
-| Monthly infra cost | ~$37-117/mo | ~$29-79/mo (Polygon.io only) |
+| | AWS Cloud | Local Server |
+|---|-----------|-------------|
+| Monthly infra cost | ~$37-117/mo | ~$29-79/mo (data API only) |
 | Annual infra cost | ~$444-1,404/yr | ~$348-948/yr |
-| Setup complexity | Medium (IAM, VPC, EventBridge) | Low (cron, systemd, pass) |
+| Setup complexity | Medium (IAM, VPC, EventBridge) | Low (cron, systemd, env vars) |
 | Ongoing maintenance | Low (AWS-managed) | Medium (OS updates, hardware) |
-| Secrets management | AWS Secrets Manager | `pass` (GPG) or Vault |
+| Secrets management | AWS Secrets Manager | `pass` (GPG), env vars |
 | Scheduling | EventBridge + Lambda | cron |
 | Alerts | AWS SNS | Telegram Bot / Pushover / Ntfy |
 | Auto-recovery | CloudWatch + auto-restart | systemd watchdog |
@@ -181,17 +178,22 @@ The system can alternatively be deployed on a personal Linux server (physical or
 
 **Historical Base**
 
-The system must maintain a local cache of daily price data (Open, High, Low, Close, Volume) for NDX, TQQQ, and SQQQ dating back to 1985. This historical dataset is the foundation for all moving average and velocity calculations.
+The system must maintain a local cache of daily price data (Open, High, Low, Close, Volume) for NDX, TQQQ, SQQQ, and BIL dating back to 1985 (or instrument inception). This historical dataset is the foundation for all moving average, volatility, and velocity calculations.
 
 **Daily Sync**
 
-- Upon boot (VM or local server), the system connects to the Polygon.io API and downloads the current day's real-time price data.
-- New data is appended to the local historical cache.
+- Upon boot (VM or local server), the system connects to the Massive API (Polygon-compatible REST endpoint at `api.massive.com`) and downloads the current day's price data for all tracked tickers.
+- New data is appended to the local Parquet cache.
 - The local cache serves as both the computational dataset and a fault-tolerance fallback if the API becomes unavailable.
+- Index tickers use the `I:` prefix on the wire (e.g., `I:NDX`), matching the Polygon convention.
+
+**Cache Format**
+
+All historical data is stored as Parquet files (one per ticker) in the `data/` directory. Parquet provides 10-100x faster reads than CSV for columnar time-series data and is the only supported cache format.
 
 ### Module B: Strategy Engine
 
-The strategy engine is the core intelligence of the system. It runs 7 concurrent sub-strategies organized around two primary market tendencies:
+The strategy engine is the core intelligence of the system. It runs 7 concurrent sub-strategies organized around two primary market tendencies, then feeds the results into a volatility-targeted allocation combiner.
 
 **Trend Following Logic**
 
@@ -205,7 +207,7 @@ The strategy engine is the core intelligence of the system. It runs 7 concurrent
 - Measure the "rate of change" (velocity) of the trend — i.e., whether momentum is accelerating or decelerating.
 - Example: If momentum readings progress from 40 to 50 to 60, the trend is accelerating (bullish).
 - Example: If momentum readings progress from 40 to 30 to 20, the trend is decelerating (bearish).
-- If deceleration is detected, the system triggers logic to trim long positions, take profits, or rotate into SQQQ.
+- If deceleration is detected, the system triggers logic to trim long positions, take profits, or rotate into defensive positions.
 
 #### B.1 Sub-Strategy Specifications
 
@@ -230,20 +232,42 @@ The 7 sub-strategies are split into two groups: trend-following (60% total weigh
 - `linear_regression_slope(series, period)` — Rolling OLS slope
 - `zscore(series, period)` — Rolling z-score normalization
 
-#### B.2 Signal Combiner Rules
+#### B.2 Signal Combiner: Volatility-Targeted Allocation
 
-The combiner translates weighted sub-strategy signals into a target allocation:
+The combiner translates sub-strategy signals into a target allocation using **volatility targeting** as the primary allocation mechanism. The 7 sub-strategy signals feed a composite score for reporting and diagnostics, but the actual portfolio allocation is driven by realized volatility.
 
-**Base Allocation:**
-- **Composite score** = sum(weight_i * raw_score_i) across all 7 strategies
-- Score >= +0.2: TQQQ allocation = score * 0.60, capped at 50%
-- Score in (-0.1, +0.2): 100% cash (dead zone — no conviction)
-- Score <= -0.1: SQQQ allocation = |score| * 0.40, capped at 30%
+**Primary Rule: Volatility Targeting**
 
-**Override Rules:**
-1. **Strong bull floor:** If all 4 trend strategies (S1-S4) have raw_score >= +0.8, TQQQ allocation is floored at 30%. Rationale: when all trend timeframes align strongly bullish, don't fight the trend even if mean-reversion signals are cautious.
-2. **Crisis mode cap:** If S5 (momentum) raw_score <= -0.5 AND S7 (volatility) raw_score <= -0.3, TQQQ is hard-capped at 10%. Rationale: when momentum is collapsing and volatility is spiking, 3x leverage decay can be devastating — protect capital.
-3. **No direct flip:** The system never goes directly from TQQQ to SQQQ or vice versa. If the previous allocation had TQQQ > 0 and the new allocation would have SQQQ > 0 (or reverse), force 100% cash for one day. Rationale: prevents overtrading during regime transitions and gives the market a day to confirm the new direction.
+```
+TQQQ weight = min(target_vol / realized_vol_20d, 1.0)
+```
+
+- **`target_vol`** = 20% annualized (hardcoded constant).
+- **`realized_vol_20d`** = 20-day realized volatility of NDX, annualized (computed as rolling 20-day standard deviation of daily returns × sqrt(252)).
+- When volatility is low (e.g., 12%), the strategy allocates up to 100% TQQQ — this is when 3x leverage compounds best.
+- When volatility spikes (e.g., 30%), the strategy reduces TQQQ to ~67%, parking the remainder in BIL.
+- When volatility is extreme (e.g., 50%), TQQQ drops to ~40%, with 60% in BIL for capital preservation.
+
+The remainder of the portfolio (1.0 - TQQQ%) is allocated to **BIL** (T-bill bond ETF), earning ~5% risk-free yield rather than sitting as uninvested cash in the brokerage account.
+
+**SQQQ Crash Sprint**
+
+During the **first 15 trading days** after NDX crosses below the 200-day SMA *and* realized volatility exceeds 25%, the combiner allocates **30% to SQQQ** and 0% to TQQQ. This captures the initial leg of a crash where SQQQ outperforms cash. After 15 days, SQQQ decays too fast (due to daily rebalancing of the 3x inverse leverage) and the strategy rotates the full portfolio to BIL instead.
+
+Sprint activation criteria (all must be true):
+1. NDX closing price is below its 200-day SMA.
+2. 20-day realized volatility >= 25% annualized.
+3. Consecutive days below the 200-day SMA <= 15.
+
+When the sprint is active: 30% SQQQ, 0% TQQQ, 70% BIL.
+
+**Override: No Direct Flip**
+
+The system never goes directly from TQQQ to SQQQ or vice versa. If the previous allocation had TQQQ > 0 and the new allocation would have SQQQ > 0 (or reverse), the combiner forces 100% BIL for one day. Rationale: prevents overtrading during regime transitions and gives the market a day to confirm the new direction.
+
+**Composite Score (Diagnostic)**
+
+A composite score is still computed as `sum(weight_i * raw_score_i)` across all 7 strategies. This score is logged, reported in telemetry alerts, and used for performance analysis, but it does **not** directly drive the allocation. The volatility-targeting rule is the sole allocation mechanism.
 
 **Target Output**
 
@@ -251,25 +275,29 @@ At the conclusion of all sub-strategy calculations, the engine outputs an exact 
 
 | Instrument | Target Allocation |
 |------------|------------------|
-| TQQQ | 30% |
+| TQQQ | 67% |
 | SQQQ | 0% |
-| Cash | 70% |
+| BIL | 33% |
 
 ### Module C: Order Execution
 
-- The system reads the current share count and cash balance from all connected brokerage accounts via API.
-- It calculates the exact number of shares to buy or sell in order to match the engine's target percentage allocation.
-- All buy/sell orders are executed exclusively during the final 10 to 15 minutes of the trading day.
+- The system reads the current share count and cash balance from the Alpaca brokerage account via REST API.
+- It calculates the exact number of shares to buy or sell for each of the three instruments (TQQQ, SQQQ, BIL) to match the engine's target percentage allocation.
+- All buy/sell orders are executed exclusively during the final 15 minutes of the trading day (configurable: `window_start_minutes_before_close` and `window_end_minutes_before_close`).
 - Orders are placed as market orders to ensure execution before the closing bell.
+- **Sells are executed before buys** to free up buying power for subsequent purchases.
+- Orders below a configurable minimum value (default: $10) are skipped to avoid unnecessary micro-trades.
+- The executor waits for fill confirmation on sell orders before proceeding to buy orders.
 
 ### Module D: Telemetry & Alerting
 
-The system must push real-time telemetry and alerts to the user's mobile phone. Alert categories include:
+The system pushes real-time telemetry and alerts to the user's mobile phone via a pluggable alert provider (Telegram, Pushover, AWS SNS, or Ntfy.sh). Alert categories include:
 
-- Current strategy position targets (e.g., "Target: 30% TQQQ, 70% Cash").
-- Order placement status (e.g., "Order placed: BUY 150 shares TQQQ @ market").
-- Execution confirmations (e.g., "Order filled: 150 TQQQ @ $42.15").
-- High-priority failure alerts if an execution error occurs, requiring potential manual intervention.
+- **Pipeline start/complete:** Notification when the daily pipeline begins and ends.
+- **Target allocation:** Current strategy position targets (e.g., "Target: 67% TQQQ, 33% BIL (composite: 0.542)").
+- **Order placement:** Order details (e.g., "Order placed: BUY 150 shares TQQQ via alpaca (id=abc123)").
+- **Execution results:** Summary of all fills, partial fills, and failures.
+- **Error alerts:** High-priority failure alerts if an execution error occurs, requiring potential manual intervention.
 
 ---
 
@@ -277,13 +305,14 @@ The system must push real-time telemetry and alerts to the user's mobile phone. 
 
 ### 5.1 Brokerage Retry Loops
 
-If a broker rejects an order (e.g., due to extreme market volatility, insufficient buying power, or transient API errors), the system must continuously retry placing the order for 5 to 10 minutes, up until the final minute before market close. Retry logic must include exponential backoff and detailed logging of each attempt.
+If Alpaca rejects an order (e.g., due to extreme market volatility, insufficient buying power, or transient API errors), the system retries with exponential backoff (base: 2 seconds, max: 60 seconds) for up to 5 attempts, or until the final minute before market close. Each attempt is logged with full details.
 
 ### 5.2 Data Source Fallbacks
 
-- **Primary source:** Polygon.io API (real-time and end-of-day data). Requires a paid plan ($29+/mo) for index data (NDX) and full history.
-- **Fallback:** Local historical cache (allows the system to operate using cached data if the API is unavailable).
-- **Secondary source:** Yahoo Finance via `yfinance` library (free, no API key required). Provides daily OHLCV for NDX (`^NDX`), TQQQ, and SQQQ. Suitable for backtesting and development but not recommended for production trading due to rate limits and occasional data gaps.
+- **Primary source:** Massive API (`api.massive.com`) — Polygon-compatible REST API providing real-time and end-of-day OHLCV data. Uses the same `v2/aggs/ticker` endpoint format as Polygon.io. Requires an API key.
+- **Fallback:** Polygon.io API — Full Polygon REST API via the `polygon-api-client` library. Requires a paid plan ($29+/mo) for index data (NDX) and full history.
+- **Development source:** Yahoo Finance via `yfinance` library (free, no API key required). Provides daily OHLCV for NDX (`^NDX`), TQQQ, SQQQ, and BIL. Suitable for backtesting and development but not recommended for production trading due to rate limits and occasional data gaps.
+- **Offline fallback:** Local Parquet cache (allows the system to operate using cached data if all APIs are unavailable).
 
 ### 5.3 Auto-Recovery
 
@@ -291,7 +320,7 @@ If the virtual machine (or local server process) crashes during the critical exe
 
 ### 5.4 Logging & Audit Trail
 
-Every action taken by the system — from data download to order placement to retry attempts — must be logged with timestamps for post-session auditing and debugging.
+Every action taken by the system — from data download to order placement to retry attempts — must be logged with timestamps for post-session auditing and debugging. The system uses structured JSON logging via `structlog`, with logs written to the configured log directory (default: `/var/log/whitelight/`).
 
 ---
 
@@ -299,19 +328,24 @@ Every action taken by the system — from data download to order placement to re
 
 | Brokerage | API Type | Commission | Integration Status | Notes |
 |-----------|----------|------------|-------------------|-------|
-| Alpaca | REST API | $0 (retail) | Phase 1 — Primary | Purpose-built for algo trading |
-| Interactive Brokers | TWS API (Python/Java/C++) | $0 (Lite) / $0.005/share (Pro) | Phase 1 — Secondary | Institutional-grade; requires IB Gateway |
-| Fidelity | None (unofficial only) | $0 | Phase 2 — Evaluate | No public retail API; high risk |
-| E-Trade | REST API (OAuth) | $0 | Phase 2 — Planned | Morgan Stanley subsidiary |
+| Alpaca | REST API | $0 (retail) | Implemented — Primary | Purpose-built for algo trading; paper + live |
+| Interactive Brokers | TWS API (Python) | $0 (Lite) / $0.005/share (Pro) | Phase 2 — Planned | Institutional-grade; requires IB Gateway |
+| E-Trade | REST API (OAuth) | $0 | Phase 2 — Evaluate | Morgan Stanley subsidiary |
+| Fidelity | None (unofficial only) | $0 | Not planned | No public retail API; high risk |
 | Robinhood | None (unofficial only) | $0 | Not recommended | No official API; TOS risk |
 
 ### 6.1 Alpaca Integration Details
 
-Alpaca provides a straightforward REST API with excellent Python SDK support. Key integration points include account info retrieval, position queries, and order submission — all via simple HTTP calls with an API key/secret pair. Paper trading is available for free, making it ideal for testing the full pipeline before going live.
+Alpaca provides a straightforward REST API with excellent Python SDK support via the `alpaca-py` library. Key integration points include:
 
-### 6.2 Interactive Brokers Integration Details
+- **Account info:** Retrieve equity, cash, and buying power.
+- **Positions:** Query current open positions with quantities and market values.
+- **Order submission:** Submit market orders for TQQQ, SQQQ, and BIL.
+- **Order status:** Poll order status until filled, cancelled, or rejected.
+- **Market hours:** Check if the market is currently open.
+- **Paper trading:** Available for free at `https://paper-api.alpaca.markets`, making it ideal for testing the full pipeline before going live.
 
-IBKR's TWS API requires running IB Gateway (a headless version of Trader Workstation) on the host machine (EC2 instance or local Linux server). The gateway authenticates with IBKR's servers and exposes a local socket that the trading bot connects to. Key considerations include: IB Gateway requires a daily restart (handled via cron), paper trading uses port 7497 while live uses 7496, and the API supports all order types including market, limit, and adaptive orders.
+Authentication uses an API key/secret pair, configured via environment variables (`WL_ALPACA_API_KEY`, `WL_ALPACA_API_SECRET`) or a secrets provider.
 
 ---
 
@@ -321,18 +355,23 @@ This section defines how the system protects sensitive credentials, secures infr
 
 ### 7.1 Secrets Storage
 
-All sensitive credentials must be stored in a secrets management system. **No API keys, tokens, or passwords may be hardcoded in source code, environment variables, or configuration files.**
+All sensitive credentials must be stored in a secrets management system. **No API keys, tokens, or passwords may be hardcoded in source code or committed to version control.**
 
 | Secret | AWS Deployment | Local Deployment | Rotation Schedule |
 |--------|---------------|-----------------|------------------|
-| Alpaca API Key + Secret | AWS Secrets Manager | `pass` (GPG-encrypted) | Every 90 days |
-| IBKR account credentials | AWS Secrets Manager | `pass` (GPG-encrypted) | Every 90 days |
-| Polygon.io API Key | AWS Secrets Manager | `pass` (GPG-encrypted) | Every 90 days |
-| Alert service token | IAM Role (SNS) | `pass` (Telegram/Pushover token) | Every 90 days |
+| Alpaca API Key + Secret | AWS Secrets Manager | `pass` (GPG) or env vars | Every 90 days |
+| Massive / Polygon API Key | AWS Secrets Manager | `pass` (GPG) or env vars | Every 90 days |
+| Alert service token | IAM Role (SNS) | `pass` or env vars (Telegram/Pushover token) | Every 90 days |
+
+The system supports three secrets providers, selectable via configuration:
+
+1. **`env`** — Reads secrets from environment variables (e.g., `WL_ALPACA_API_KEY`). Simplest option for development and single-server deployments.
+2. **`pass`** — Retrieves secrets from GNU `pass` (GPG-encrypted password store). Recommended for production local deployments.
+3. **`aws_secrets_manager`** — Fetches secrets from AWS Secrets Manager with caching. Recommended for AWS deployments.
 
 **AWS deployment:** $0.40/secret/month via Secrets Manager. Store related credentials as a single JSON object to minimize cost. The EC2 instance authenticates via an IAM Instance Profile (no static AWS keys on the machine). Credentials are held in memory only for the duration of the trading session and are never written to disk.
 
-**Local deployment:** Use `pass`, the standard Unix password manager. Each secret is stored as a GPG-encrypted file in `~/.password-store/whitelight/`. The trading script retrieves credentials at runtime via `pass show whitelight/alpaca-key`, loads them into memory, and never writes plaintext to disk. The GPG private key should be protected with a strong passphrase, and the keyring should be backed up securely (e.g., encrypted USB drive stored off-site).
+**Local deployment:** For development, environment variables via a `.env` file are sufficient. For production, use `pass` (the standard Unix password manager). Each secret is stored as a GPG-encrypted file in `~/.password-store/whitelight/`. The trading script retrieves credentials at runtime via `pass show whitelight/alpaca-key`, loads them into memory, and never writes plaintext to disk.
 
 ### 7.2 IAM & Access Control (AWS)
 
@@ -343,27 +382,25 @@ All sensitive credentials must be stored in a secrets management system. **No AP
 ### 7.3 Network Security
 
 - **AWS — VPC isolation:** The EC2 instance runs in a private subnet within a dedicated VPC. It has no public IP address. A NAT Gateway provides outbound internet access. Security Groups restrict all inbound traffic except SSH from a single whitelisted IP.
-- **Local — Firewall:** UFW or iptables configured to deny all inbound traffic except SSH from trusted IPs. The trading bot only makes outbound HTTPS connections.
-- **IB Gateway ports (7496/7497):** These are bound to localhost only — they are not exposed to the network (both deployments).
+- **Local — Firewall:** UFW or iptables configured to deny all inbound traffic except SSH from trusted IPs. The trading bot only makes outbound HTTPS connections (to Alpaca, Massive/Polygon, and alert services).
 
 ### 7.4 Instance Hardening
 
 - **SSH key-only authentication:** Password-based SSH is disabled. Access requires a private key stored securely on your local machine (never on the server).
 - **Fail2Ban:** Installed and configured to ban IPs after 3 failed SSH attempts.
 - **Automatic security updates:** Unattended upgrades enabled for critical security patches.
-- **No withdrawal permissions:** Brokerage API keys are configured with trade and read permissions only. Withdrawal/transfer capabilities are never enabled on API keys.
+- **No withdrawal permissions:** Alpaca API keys are configured with trade and read permissions only. Withdrawal/transfer capabilities are never enabled on API keys.
 
 ### 7.5 Brokerage-Level Security
 
 - **Alpaca:** API keys are scoped to trading and account-read permissions only. IP whitelisting is enabled, restricting API access to the server's public IP.
-- **Interactive Brokers:** IB Gateway runs with a dedicated "API-only" user that has trading permissions but cannot initiate wire transfers or ACH withdrawals. Two-factor authentication is enabled on the master account.
-- **Separate API keys per brokerage:** Each brokerage gets its own dedicated API credentials. Compromise of one does not affect the other.
+- **Separate credentials per service:** Each external service (brokerage, data provider, alert service) gets its own dedicated credentials. Compromise of one does not affect the others.
 
 ### 7.6 Audit & Incident Response
 
 - All API calls, order placements, and credential retrievals are logged with timestamps.
 - **AWS deployment:** Logs go to CloudWatch Logs. CloudWatch Alarms trigger SNS notifications if unexpected activity is detected (e.g., more than 10 orders in a single session, API authentication failures, or instance running longer than 30 minutes).
-- **Local deployment:** Logs go to `/var/log/whitelight/` with `logrotate` managing retention. The trading script itself sends alert notifications (via Telegram/Pushover) for anomalous activity. A simple watchdog script checks log output after each session and flags errors.
+- **Local deployment:** Logs go to `/var/log/whitelight/` with `logrotate` managing retention. The trading script itself sends alert notifications (via Telegram/Pushover) for anomalous activity.
 - Logs are retained for 90 days minimum for post-incident analysis.
 
 ---
@@ -372,14 +409,14 @@ All sensitive credentials must be stored in a secrets management system. **No AP
 
 ### 8.1 Backtesting Framework
 
-The system includes a built-in backtesting engine that replays historical NDX/TQQQ/SQQQ data through the full strategy pipeline day-by-day. This enables validation of strategy logic against known historical performance before deploying to live trading.
+The system includes a built-in backtesting engine that replays historical NDX/TQQQ/SQQQ/BIL data through the full strategy pipeline day-by-day. This enables validation of strategy logic against known historical performance before deploying to live trading.
 
 **How it works:**
 
-1. Load historical OHLCV data for NDX, TQQQ, and SQQQ (from Parquet cache, Polygon.io, or Yahoo Finance).
+1. Load historical OHLCV data for NDX, TQQQ, SQQQ, and BIL (from Parquet cache, Massive, Polygon.io, or Yahoo Finance).
 2. For each trading day after a 260-day warmup period (required for the 250-day SMA lookback):
    - Run the full 7-strategy engine on NDX data up to that day.
-   - Get the target allocation from the combiner (including all override rules).
+   - Get the target allocation from the volatility-targeting combiner (including SQQQ sprint and no-flip rules).
    - Simulate execution at closing prices (market orders, same as live system).
    - Track portfolio value, positions, cash, and trades.
 3. Compute performance metrics and compare against Collective2 benchmark returns.
@@ -389,7 +426,8 @@ The system includes a built-in backtesting engine that replays historical NDX/TQ
 | Source | Cost | API Key Required | NDX History | Best For |
 |--------|------|-----------------|-------------|----------|
 | Yahoo Finance (`yfinance`) | Free | No | ~2000-present | Development, quick validation |
-| Polygon.io | $29+/mo | Yes | 1985-present | Full historical backtest, production |
+| Massive API | Varies | Yes | 1985-present | Full historical backtest |
+| Polygon.io | $29+/mo | Yes | 1985-present | Full historical backtest |
 | Local Parquet cache | Free | No (pre-seeded) | Depends on seed | Offline development |
 
 **Usage:**
@@ -401,8 +439,8 @@ python scripts/backtest.py --source yfinance
 # Full backtest from C2 inception date
 python scripts/backtest.py --start 2022-07-23 --source yfinance
 
-# Backtest with Polygon data (requires API key)
-python scripts/backtest.py --source polygon --api-key YOUR_KEY
+# Backtest with Massive data (requires API key)
+python scripts/backtest.py --source massive --api-key YOUR_KEY
 
 # Compare results against Collective2 monthly returns
 python scripts/backtest.py --compare-c2
@@ -430,8 +468,9 @@ The backtesting framework calculates the following metrics for comparison agains
 The backtested strategy should approximate (not exactly match) the Collective2 performance, accounting for:
 
 - **Execution differences:** The backtest simulates market orders at closing prices, while live C2 trades may have executed at slightly different intraday prices.
-- **Strategy evolution:** The discretionary strategy on C2 may have evolved over time; the automated system implements the rules as of v1.4 of this PRD.
-- **No-flip rule:** The automated system enforces a mandatory cash day between TQQQ and SQQQ positions, which the discretionary strategy may not have always followed.
+- **Strategy evolution:** The discretionary strategy on C2 may have evolved over time; the automated system implements the volatility-targeting rules as of v1.5 of this PRD.
+- **No-flip rule:** The automated system enforces a mandatory cash/BIL day between TQQQ and SQQQ positions, which the discretionary strategy may not have always followed.
+- **BIL yield:** The backtest includes estimated BIL returns during cash periods, which the C2 track record may not account for identically.
 
 A successful validation should show:
 - Annual return within +/- 15% of C2 benchmark
@@ -443,7 +482,18 @@ A successful validation should show:
 
 ## 9. Future Enhancements (Phase 2)
 
-### 9.1 Signal Syndication via Collective2
+### 9.1 Interactive Brokers Integration
+
+Add IBKR as a secondary brokerage for redundancy and failover. The codebase includes a preliminary `IBKRClient` implementation using the `ib_async` library, but it has not been tested or deployed. Full implementation requires:
+
+- IB Gateway running on the host machine (headless version of Trader Workstation).
+- Dedicated IBKR account with API-only permissions.
+- Failover logic: If Alpaca's API is unreachable during the execution window, automatically route orders through IBKR.
+- Portfolio aggregation across both brokerages.
+
+IBKR Lite offers commission-free US stock/ETF trades; IBKR Pro charges $0.005/share (min $1) with access to superior order routing. Paper trading uses port 7497 while live uses 7496.
+
+### 9.2 Signal Syndication via Collective2
 
 The strategy is already listed on Collective2 as "Whitelight" (ID: K6Q9FDJ8A) with $1.2M in follower live capital and a $50/month subscription price. Phase 2 will build a direct API integration to automate signal broadcasting from the White Light engine to Collective2, eliminating any manual signal entry.
 
@@ -451,14 +501,13 @@ The strategy is already listed on Collective2 as "Whitelight" (ID: K6Q9FDJ8A) wi
 - SMS-based trade alerts.
 - Email-based trade notifications.
 
-### 9.2 Additional Brokerage Integrations
+### 9.3 Additional Brokerage Integrations
 
 Extend API connectivity to E-Trade and potentially Fidelity (if/when a public API becomes available) to serve a broader user base and provide additional redundancy.
 
-### 9.3 Enhanced Risk Controls
+### 9.4 Enhanced Risk Controls
 
 - **Emergency stop (circuit breaker):** Automatic halt of all trading activity if portfolio drawdown exceeds a configurable threshold. Note: the historical max drawdown is -37.58%, so a circuit breaker at -40% to -45% would allow normal operation while catching catastrophic scenarios.
-- **Volatility filters:** Additional logic to reduce position sizing during periods of extreme market turbulence.
 - **Manual override interface:** A secure web or mobile dashboard allowing the user to pause, resume, or manually adjust the system in real-time.
 
 ---
@@ -470,7 +519,10 @@ Extend API connectivity to E-Trade and potentially Fidelity (if/when a public AP
 | NDX | NASDAQ 100 Index — benchmark index of 100 largest non-financial NASDAQ-listed companies |
 | TQQQ | ProShares UltraPro QQQ — 3x leveraged ETF tracking the NASDAQ 100 (long) |
 | SQQQ | ProShares UltraPro Short QQQ — 3x inverse leveraged ETF tracking the NASDAQ 100 (short) |
+| BIL | SPDR Bloomberg 1-3 Month T-Bill ETF — ultra-short-term government bond ETF used as a cash proxy (~5% yield) |
 | SMA | Simple Moving Average — arithmetic mean of closing prices over a specified number of days |
+| Volatility Targeting | Allocation strategy that scales position size inversely to realized volatility: `weight = target_vol / realized_vol` |
+| Realized Volatility | Annualized standard deviation of daily log returns over a lookback window (typically 20 days) |
 | Mean Reversion | Strategy based on the tendency of prices to return to their historical average after extreme moves |
 | Velocity | Rate of change of a trend; measures whether momentum is accelerating or decelerating |
 | Collective2 | Third-party platform for syndicating and mirroring trade signals across subscriber brokerage accounts |
@@ -486,6 +538,7 @@ Extend API connectivity to E-Trade and potentially Fidelity (if/when a public AP
 | Bollinger %B | Normalized position within Bollinger Bands: (price - lower) / (upper - lower); values near 0 = oversold, near 1 = overbought |
 | ROC | Rate of Change — percentage change over N periods; used to measure momentum velocity |
 | Parquet | Columnar file format optimized for analytical queries; 10-100x faster than CSV for time-series data |
+| Massive API | Polygon-compatible REST API at `api.massive.com` used as the primary market data source |
 
 ---
 
