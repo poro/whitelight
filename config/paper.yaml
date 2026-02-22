@@ -10,6 +10,10 @@ secrets:
 alerts:
   provider: "noop"
 
+strategy:
+  combiner_version: 2   # 1 = original, 2 = vol-adaptive with ATR stops
+  position_sizing: true  # scale position by volatility percentile
+
 brokerages:
   primary: "alpaca"
   secondary: "ibkr"

@@ -1,0 +1,506 @@
+{
+  "short_1yr": {
+    "White Light v1": {
+      "cagr": -7.87,
+      "max_dd": -13.96,
+      "sharpe": -0.57,
+      "sortino": -0.248,
+      "calmar": -0.564,
+      "pf": 0.79,
+      "trades": 12,
+      "win_rate": 50.0,
+      "final": 92132.0,
+      "years": 1.0,
+      "regime_pct": {
+        "bull": 13.5,
+        "bear": 0.0,
+        "neutral": 86.5
+      },
+      "name": "White Light v1"
+    },
+    "White Light v2": {
+      "cagr": -16.12,
+      "max_dd": -21.15,
+      "sharpe": -1.633,
+      "sortino": -0.61,
+      "calmar": -0.762,
+      "pf": 0.36,
+      "trades": 6,
+      "win_rate": 0.0,
+      "final": 83888.0,
+      "years": 1.0,
+      "regime_pct": {
+        "bull": 4.0,
+        "bear": 1.2,
+        "neutral": 94.8
+      },
+      "name": "White Light v2"
+    },
+    "White Light v2 Conservative": {
+      "cagr": -11.65,
+      "max_dd": -16.31,
+      "sharpe": -1.533,
+      "sortino": -0.568,
+      "calmar": -0.714,
+      "pf": 0.4,
+      "trades": 6,
+      "win_rate": 33.3,
+      "final": 88355.0,
+      "years": 1.0,
+      "regime_pct": {
+        "bull": 4.0,
+        "bear": 1.2,
+        "neutral": 94.8
+      },
+      "name": "White Light v2 Conservative"
+    }
+  },
+  "short_2yr": {
+    "White Light v1": {
+      "cagr": -29.27,
+      "max_dd": -57.49,
+      "sharpe": -0.566,
+      "sortino": -0.347,
+      "calmar": -0.509,
+      "pf": 0.82,
+      "trades": 41,
+      "win_rate": 57.1,
+      "final": 50004.0,
+      "years": 2.0,
+      "regime_pct": {
+        "bull": 33.2,
+        "bear": 3.4,
+        "neutral": 63.4
+      },
+      "name": "White Light v1"
+    },
+    "White Light v2": {
+      "cagr": -11.35,
+      "max_dd": -53.27,
+      "sharpe": -0.007,
+      "sortino": -0.005,
+      "calmar": -0.213,
+      "pf": 1.0,
+      "trades": 16,
+      "win_rate": 37.5,
+      "final": 78583.0,
+      "years": 2.0,
+      "regime_pct": {
+        "bull": 38.6,
+        "bear": 6.6,
+        "neutral": 54.9
+      },
+      "name": "White Light v2"
+    },
+    "White Light v2 Conservative": {
+      "cagr": -2.4,
+      "max_dd": -38.59,
+      "sharpe": 0.105,
+      "sortino": 0.083,
+      "calmar": -0.062,
+      "pf": 1.03,
+      "trades": 16,
+      "win_rate": 37.5,
+      "final": 95256.0,
+      "years": 2.0,
+      "regime_pct": {
+        "bull": 38.6,
+        "bear": 6.6,
+        "neutral": 54.9
+      },
+      "name": "White Light v2 Conservative"
+    }
+  },
+  "whitelight_3_5yr": {
+    "White Light v1": {
+      "cagr": 5.52,
+      "max_dd": -57.49,
+      "sharpe": 0.352,
+      "sortino": 0.285,
+      "calmar": 0.096,
+      "pf": 1.09,
+      "trades": 73,
+      "win_rate": 59.5,
+      "final": 121183.0,
+      "years": 3.6,
+      "regime_pct": {
+        "bull": 52.7,
+        "bear": 1.9,
+        "neutral": 45.4
+      },
+      "name": "White Light v1"
+    },
+    "White Light v2": {
+      "cagr": 8.34,
+      "max_dd": -53.27,
+      "sharpe": 0.415,
+      "sortino": 0.365,
+      "calmar": 0.157,
+      "pf": 1.11,
+      "trades": 32,
+      "win_rate": 68.8,
+      "final": 133170.0,
+      "years": 3.6,
+      "regime_pct": {
+        "bull": 51.3,
+        "bear": 4.8,
+        "neutral": 43.9
+      },
+      "name": "White Light v2"
+    },
+    "White Light v2 Conservative": {
+      "cagr": 17.51,
+      "max_dd": -38.59,
+      "sharpe": 0.649,
+      "sortino": 0.622,
+      "calmar": 0.454,
+      "pf": 1.17,
+      "trades": 32,
+      "win_rate": 68.8,
+      "final": 178047.0,
+      "years": 3.6,
+      "regime_pct": {
+        "bull": 51.3,
+        "bear": 4.8,
+        "neutral": 43.9
+      },
+      "name": "White Light v2 Conservative"
+    }
+  },
+  "covid_recovery": {
+    "White Light v1": {
+      "cagr": 21.01,
+      "max_dd": -31.58,
+      "sharpe": 0.752,
+      "sortino": 0.646,
+      "calmar": 0.665,
+      "pf": 1.2,
+      "trades": 25,
+      "win_rate": 50.0,
+      "final": 146330.0,
+      "years": 2.0,
+      "regime_pct": {
+        "bull": 47.7,
+        "bear": 0.0,
+        "neutral": 52.3
+      },
+      "name": "White Light v1"
+    },
+    "White Light v2": {
+      "cagr": 5.63,
+      "max_dd": -39.87,
+      "sharpe": 0.335,
+      "sortino": 0.305,
+      "calmar": 0.141,
+      "pf": 1.09,
+      "trades": 13,
+      "win_rate": 50.0,
+      "final": 111551.0,
+      "years": 2.0,
+      "regime_pct": {
+        "bull": 45.9,
+        "bear": 0.0,
+        "neutral": 54.1
+      },
+      "name": "White Light v2"
+    },
+    "White Light v2 Conservative": {
+      "cagr": 9.87,
+      "max_dd": -31.05,
+      "sharpe": 0.473,
+      "sortino": 0.435,
+      "calmar": 0.318,
+      "pf": 1.12,
+      "trades": 13,
+      "win_rate": 50.0,
+      "final": 120668.0,
+      "years": 2.0,
+      "regime_pct": {
+        "bull": 45.9,
+        "bear": 0.0,
+        "neutral": 54.1
+      },
+      "name": "White Light v2 Conservative"
+    }
+  },
+  "bear_2022": {
+    "White Light v1": {
+      "cagr": -9.31,
+      "max_dd": -15.6,
+      "sharpe": -0.461,
+      "sortino": -0.217,
+      "calmar": -0.597,
+      "pf": 0.74,
+      "trades": 2,
+      "win_rate": 0.0,
+      "final": 92262.0,
+      "years": 0.8,
+      "regime_pct": {
+        "bull": 0.0,
+        "bear": 3.8,
+        "neutral": 96.2
+      },
+      "name": "White Light v1"
+    },
+    "White Light v2": {
+      "cagr": 5.13,
+      "max_dd": 0.0,
+      "sharpe": 0,
+      "sortino": 0,
+      "calmar": 0,
+      "pf": 99,
+      "trades": 0,
+      "win_rate": 0,
+      "final": 104213.0,
+      "years": 0.8,
+      "regime_pct": {
+        "bull": 0.0,
+        "bear": 0.0,
+        "neutral": 100.0
+      },
+      "name": "White Light v2"
+    },
+    "White Light v2 Conservative": {
+      "cagr": 5.13,
+      "max_dd": 0.0,
+      "sharpe": 0,
+      "sortino": 0,
+      "calmar": 0,
+      "pf": 99,
+      "trades": 0,
+      "win_rate": 0,
+      "final": 104213.0,
+      "years": 0.8,
+      "regime_pct": {
+        "bull": 0.0,
+        "bear": 0.0,
+        "neutral": 100.0
+      },
+      "name": "White Light v2 Conservative"
+    }
+  },
+  "bull_2023_2024": {
+    "White Light v1": {
+      "cagr": 25.37,
+      "max_dd": -21.06,
+      "sharpe": 0.863,
+      "sortino": 0.819,
+      "calmar": 1.204,
+      "pf": 1.23,
+      "trades": 30,
+      "win_rate": 53.3,
+      "final": 163168.0,
+      "years": 2.2,
+      "regime_pct": {
+        "bull": 49.1,
+        "bear": 0.0,
+        "neutral": 50.9
+      },
+      "name": "White Light v1"
+    },
+    "White Light v2": {
+      "cagr": 18.56,
+      "max_dd": -39.07,
+      "sharpe": 0.693,
+      "sortino": 0.591,
+      "calmar": 0.475,
+      "pf": 1.19,
+      "trades": 17,
+      "win_rate": 75.0,
+      "final": 144592.0,
+      "years": 2.2,
+      "regime_pct": {
+        "bull": 40.4,
+        "bear": 1.5,
+        "neutral": 58.1
+      },
+      "name": "White Light v2"
+    },
+    "White Light v2 Conservative": {
+      "cagr": 23.63,
+      "max_dd": -27.03,
+      "sharpe": 0.962,
+      "sortino": 0.849,
+      "calmar": 0.874,
+      "pf": 1.28,
+      "trades": 17,
+      "win_rate": 75.0,
+      "final": 158300.0,
+      "years": 2.2,
+      "regime_pct": {
+        "bull": 40.4,
+        "bear": 1.5,
+        "neutral": 58.1
+      },
+      "name": "White Light v2 Conservative"
+    }
+  },
+  "full_5yr": {
+    "White Light v1": {
+      "cagr": -9.56,
+      "max_dd": -57.49,
+      "sharpe": 0.08,
+      "sortino": 0.076,
+      "calmar": -0.166,
+      "pf": 1.02,
+      "trades": 115,
+      "win_rate": 51.7,
+      "final": 60536.0,
+      "years": 5.0,
+      "regime_pct": {
+        "bull": 41.0,
+        "bear": 16.1,
+        "neutral": 42.9
+      },
+      "name": "White Light v1"
+    },
+    "White Light v2": {
+      "cagr": -0.79,
+      "max_dd": -53.27,
+      "sharpe": 0.259,
+      "sortino": 0.278,
+      "calmar": -0.015,
+      "pf": 1.06,
+      "trades": 50,
+      "win_rate": 60.0,
+      "final": 96096.0,
+      "years": 5.0,
+      "regime_pct": {
+        "bull": 47.2,
+        "bear": 14.7,
+        "neutral": 38.1
+      },
+      "name": "White Light v2"
+    },
+    "White Light v2 Conservative": {
+      "cagr": 8.23,
+      "max_dd": -45.95,
+      "sharpe": 0.402,
+      "sortino": 0.456,
+      "calmar": 0.179,
+      "pf": 1.09,
+      "trades": 50,
+      "win_rate": 56.0,
+      "final": 148456.0,
+      "years": 5.0,
+      "regime_pct": {
+        "bull": 47.2,
+        "bear": 14.7,
+        "neutral": 38.1
+      },
+      "name": "White Light v2 Conservative"
+    }
+  },
+  "full_cycle_6yr": {
+    "White Light v1": {
+      "cagr": -1.63,
+      "max_dd": -60.14,
+      "sharpe": 0.229,
+      "sortino": 0.222,
+      "calmar": -0.027,
+      "pf": 1.05,
+      "trades": 135,
+      "win_rate": 52.9,
+      "final": 90403.0,
+      "years": 6.1,
+      "regime_pct": {
+        "bull": 48.2,
+        "bear": 13.1,
+        "neutral": 38.7
+      },
+      "name": "White Light v1"
+    },
+    "White Light v2": {
+      "cagr": 0.59,
+      "max_dd": -61.86,
+      "sharpe": 0.279,
+      "sortino": 0.302,
+      "calmar": 0.01,
+      "pf": 1.06,
+      "trades": 62,
+      "win_rate": 58.1,
+      "final": 103694.0,
+      "years": 6.1,
+      "regime_pct": {
+        "bull": 52.3,
+        "bear": 12.0,
+        "neutral": 35.7
+      },
+      "name": "White Light v2"
+    },
+    "White Light v2 Conservative": {
+      "cagr": 9.26,
+      "max_dd": -49.15,
+      "sharpe": 0.422,
+      "sortino": 0.482,
+      "calmar": 0.188,
+      "pf": 1.1,
+      "trades": 62,
+      "win_rate": 54.8,
+      "final": 172185.0,
+      "years": 6.1,
+      "regime_pct": {
+        "bull": 52.3,
+        "bear": 12.0,
+        "neutral": 35.7
+      },
+      "name": "White Light v2 Conservative"
+    }
+  },
+  "max_history": {
+    "White Light v1": {
+      "cagr": 0.69,
+      "max_dd": -80.06,
+      "sharpe": 0.239,
+      "sortino": 0.238,
+      "calmar": 0.009,
+      "pf": 1.06,
+      "trades": 375,
+      "win_rate": 55.0,
+      "final": 110981.0,
+      "years": 15.1,
+      "regime_pct": {
+        "bull": 55.5,
+        "bear": 9.8,
+        "neutral": 34.7
+      },
+      "name": "White Light v1"
+    },
+    "White Light v2": {
+      "cagr": 3.09,
+      "max_dd": -74.31,
+      "sharpe": 0.301,
+      "sortino": 0.33,
+      "calmar": 0.042,
+      "pf": 1.06,
+      "trades": 147,
+      "win_rate": 52.0,
+      "final": 158587.0,
+      "years": 15.1,
+      "regime_pct": {
+        "bull": 61.9,
+        "bear": 10.7,
+        "neutral": 27.3
+      },
+      "name": "White Light v2"
+    },
+    "White Light v2 Conservative": {
+      "cagr": 8.2,
+      "max_dd": -70.47,
+      "sharpe": 0.4,
+      "sortino": 0.457,
+      "calmar": 0.116,
+      "pf": 1.09,
+      "trades": 147,
+      "win_rate": 50.7,
+      "final": 329656.0,
+      "years": 15.1,
+      "regime_pct": {
+        "bull": 61.9,
+        "bear": 10.7,
+        "neutral": 27.3
+      },
+      "name": "White Light v2 Conservative"
+    }
+  }
+}

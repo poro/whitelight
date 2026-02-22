@@ -83,7 +83,15 @@ async def run_pipeline(config: WhiteLightConfig, dry_run: bool = False) -> None:
             S7VolatilityRegime(weight=weights["s7_volatility_regime"], **params.get("s7_volatility_regime", {})),
         ]
 
-        combiner = SignalCombiner()
+        # Select combiner version
+        combiner_version = getattr(config.strategy, 'combiner_version', 1)
+        if combiner_version == 2:
+            from whitelight.strategy.combiner_v2 import SignalCombinerV2
+            combiner = SignalCombinerV2()
+            logger.info("Using v2 combiner (vol-adaptive + ATR stops)")
+        else:
+            combiner = SignalCombiner()
+            logger.info("Using v1 combiner (volatility targeting)")
         engine = StrategyEngine(strategies=strategies, combiner=combiner)
         target = engine.evaluate(ndx_data)
 

@@ -112,6 +112,31 @@ def linear_regression_slope(series: pd.Series, period: int) -> pd.Series:
     )
 
 
+def ema(series: pd.Series, period: int) -> pd.Series:
+    """Exponential moving average."""
+    return series.ewm(span=period, min_periods=period, adjust=False).mean()
+
+
+def atr(
+    high: pd.Series, low: pd.Series, close: pd.Series, period: int
+) -> pd.Series:
+    """Average True Range."""
+    tr = pd.concat(
+        [high - low, (high - close.shift(1)).abs(), (low - close.shift(1)).abs()],
+        axis=1,
+    ).max(axis=1)
+    return tr.rolling(window=period, min_periods=period).mean()
+
+
+def atr_percentile(
+    high: pd.Series, low: pd.Series, close: pd.Series,
+    atr_period: int = 14, lookback: int = 252,
+) -> pd.Series:
+    """Rolling percentile rank of ATR over lookback window. Returns 0.0-1.0."""
+    a = atr(high, low, close, atr_period)
+    return a.rolling(window=lookback, min_periods=min(60, lookback)).rank(pct=True)
+
+
 def zscore(series: pd.Series, lookback: int) -> pd.Series:
     """Rolling z-score normalization.
 

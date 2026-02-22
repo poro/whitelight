@@ -82,6 +82,8 @@ class StrategyConfig(BaseModel):
     allocation_tiers: list[dict[str, Any]] = []
     min_rebalance_threshold: float = 0.05
     params: dict[str, dict[str, Any]] = {}
+    combiner_version: int = 1          # 1 = original, 2 = vol-adaptive with ATR stops
+    position_sizing: bool = False       # scale position by volatility percentile
 
     @field_validator("substrategy_weights")
     @classmethod
