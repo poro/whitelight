@@ -1,6 +1,6 @@
 # Product Requirements Document (PRD): "White Light" Automated Trading System
 
-**Version:** 1.5
+**Version:** 1.6
 **Date:** February 22, 2026
 **Author:** Mark Ollila
 **Status:** Draft
@@ -480,7 +480,177 @@ A successful validation should show:
 
 ---
 
-## 9. Future Enhancements (Phase 2)
+## 9. Strategy Research & Discovery Pipeline
+
+Phase 3 of the White Light project adds a systematic pipeline for discovering, extracting, converting, and backtesting trading strategies from public sources. The goal is to continuously expand the strategy library beyond the core 7 sub-strategies, using community-sourced algorithms as candidates that must pass rigorous backtesting before consideration for live deployment.
+
+### 9.1 Strategy Sources
+
+#### TradingView Community Scripts
+
+TradingView hosts over 150,000 community-contributed scripts written in **Pine Script**, its proprietary scripting language. These scripts range from simple moving-average crossovers to sophisticated multi-indicator systems. TradingView is the primary source for strategy discovery because:
+
+- Strategies include built-in backtesting results (profit factor, drawdown, Sharpe) visible on the script page.
+- Scripts are tagged by category (trend following, mean reversion, momentum, volatility, etc.).
+- Community ratings and usage counts provide a first-pass quality filter.
+- Many scripts are open-source, allowing full code inspection.
+
+**Scraping approach:** Use the `tradingview-script-downloader` Python tool (Selenium + BeautifulSoup) to programmatically download Pine Script source code from public strategy pages. Filter by category, minimum rating, and recency.
+
+#### Reddit Communities
+
+Use **PRAW** (Python Reddit API Wrapper) to monitor strategy-focused subreddits:
+
+- r/algotrading — algorithmic trading strategies and backtesting discussion
+- r/quant — quantitative finance research
+- r/Trading — general trading strategy posts
+- r/wallstreetbets — occasionally surfaces unconventional momentum ideas
+
+The scraper searches for posts containing strategy logic, Pine Script snippets, Python backtest code, or links to TradingView scripts. Posts are scored by upvotes, comment quality, and whether they include verifiable backtest results.
+
+#### Discord Communities
+
+Deploy a lightweight Discord bot (using `discord.py`) to monitor channels in trading-focused servers the user is a member of. The bot listens for messages containing:
+
+- Pine Script code blocks
+- Backtest result screenshots or tables
+- Strategy parameter discussions
+- Links to TradingView scripts or GitHub repos
+
+Messages are logged to a local database for later review and conversion.
+
+### 9.2 Pine Script to Python Conversion
+
+TradingView strategies are written in Pine Script, which cannot run outside TradingView's platform. To backtest these strategies locally with Backtrader or VectorBT, they must be converted to Python. Three approaches are available, in order of preference:
+
+#### Approach A: Automated Conversion via Pineify
+
+**Pineify** (pineify.com) is an AI-powered tool that converts Pine Script to Python automatically. It handles most common Pine Script constructs including:
+
+- `ta.sma()`, `ta.ema()`, `ta.rsi()`, `ta.macd()` and other built-in technical indicators
+- `strategy.entry()` / `strategy.close()` order logic
+- `input()` parameters → Python function arguments
+- Basic conditional logic and variable assignments
+
+**Limitations:** Struggles with `var`/`varip` stateful variables, custom functions with recursion, `security()` multi-timeframe calls, and Pine Script v5 advanced features like `matrix` types.
+
+#### Approach B: StrategyGenerator (GitHub)
+
+An open-source Pine Script parser that extracts strategy logic into a structured intermediate representation, which can then be rendered as Python code targeting Backtrader or VectorBT. More transparent than Pineify because the conversion logic is inspectable and modifiable.
+
+**Best for:** Batch conversion of simple-to-moderate strategies where you want full control over the output format.
+
+#### Approach C: Hybrid Manual Conversion
+
+For complex strategies that automated tools cannot handle cleanly:
+
+1. Use Pineify or StrategyGenerator for an initial rough conversion.
+2. Manually review and correct the Python output against the original Pine Script.
+3. Validate by comparing the Python backtest results against TradingView's built-in backtest for the same date range and instrument.
+
+**Recommended workflow:** Start with Approach A for each script. If the automated output fails validation (results diverge by more than 5% from TradingView's backtest), fall back to Approach C.
+
+### 9.3 Backtesting Frameworks
+
+#### VectorBT (Primary)
+
+VectorBT is the recommended local backtesting framework for White Light strategy evaluation because of its speed and pandas/NumPy-native design.
+
+- **Speed:** Vectorized operations run 100-1000x faster than event-driven frameworks, enabling rapid parameter sweeps.
+- **Integration:** Natively works with pandas DataFrames, which aligns with White Light's Parquet-based data cache.
+- **Analysis:** Built-in performance metrics (Sharpe, Sortino, Calmar, max drawdown, profit factor) and visualization.
+- **Portfolio simulation:** Supports multi-asset backtests with rebalancing, which matches the TQQQ/SQQQ/BIL universe.
+
+```bash
+pip install vectorbt
+```
+
+#### Backtrader (Secondary)
+
+Backtrader is a mature, event-driven backtesting framework better suited for strategies that require complex order logic (bracket orders, trailing stops, position sizing rules).
+
+- **Event-driven:** Simulates bar-by-bar execution, which is more realistic for strategies with path-dependent logic.
+- **Broker simulation:** Models slippage, commissions, and margin requirements.
+- **Community:** Large library of community-contributed indicators and analyzers.
+- **Pine Script affinity:** Many Pine Script conversion tools target Backtrader's `Strategy` class as their output format.
+
+```bash
+pip install backtrader
+```
+
+#### QuantConnect LEAN (Cloud Alternative)
+
+QuantConnect's LEAN engine provides cloud-based backtesting with institutional-grade data and has a native integration with Collective2 for signal syndication.
+
+- **Data:** Free access to US equity daily/minute data going back to 1998.
+- **C2 integration:** Strategies validated on QuantConnect can be deployed directly to Collective2.
+- **Limitations:** Requires C# or Python, runs in QuantConnect's cloud (not local), and free tier has limited backtests per month.
+
+**Use case:** Final validation of strategies that have already passed local VectorBT screening, and as the bridge to Collective2 signal syndication.
+
+### 9.4 Performance Verification with Kinfo
+
+**Kinfo** (kinfo.com) is a trade journal and analytics platform that connects directly to brokerage accounts (including IBKR and Alpaca) to independently verify live trading performance.
+
+- **Automated import:** Syncs trades from connected brokerages — no manual entry.
+- **Independent verification:** Third-party confirmation of returns, drawdowns, and trade statistics.
+- **Benchmarking:** Compare White Light's live performance against its backtest expectations and against the Collective2 track record.
+- **Peer comparison:** See how the strategy stacks up against other verified traders on the platform.
+
+Kinfo serves as an independent audit trail, providing credibility for the strategy's live performance beyond self-reported metrics.
+
+### 9.5 End-to-End Pipeline
+
+The complete strategy research pipeline operates in five stages:
+
+```
+┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+│  DISCOVER   │───▶│   EXTRACT   │───▶│   CONVERT   │───▶│  BACKTEST   │───▶│    RANK     │
+│             │    │             │    │             │    │             │    │             │
+│ TradingView │    │ Pine Script │    │ Pine → Py   │    │ VectorBT /  │    │ Sharpe,     │
+│ Reddit      │    │ source code │    │ (Pineify /  │    │ Backtrader  │    │ Calmar,     │
+│ Discord     │    │ extraction  │    │  hybrid)    │    │ validation  │    │ drawdown,   │
+│ Kinfo       │    │             │    │             │    │             │    │ profit fac  │
+└─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘
+```
+
+**Stage 1 — Discover:** Scrape TradingView (filtered by category, rating, recency), Reddit (PRAW), and Discord (bot) for strategy candidates. Log metadata (source URL, author, description, TradingView backtest stats if available).
+
+**Stage 2 — Extract:** Download the full Pine Script source code using `tradingview-script-downloader`. For Reddit/Discord strategies, extract code blocks from posts/messages.
+
+**Stage 3 — Convert:** Run Pine Script through Pineify or StrategyGenerator to produce Python code targeting VectorBT or Backtrader. Flag strategies that fail automated conversion for manual review.
+
+**Stage 4 — Backtest:** Execute the converted strategy against White Light's historical data cache (Parquet files). Run on the TQQQ/SQQQ/BIL universe over the full available history. Compare results against TradingView's reported metrics as a sanity check.
+
+**Stage 5 — Rank:** Score each strategy on a composite metric:
+
+| Metric | Weight | Minimum Threshold |
+|--------|--------|-------------------|
+| Sharpe Ratio | 25% | > 1.0 |
+| Calmar Ratio | 25% | > 0.5 |
+| Max Drawdown | 20% | < -40% |
+| Profit Factor | 15% | > 1.5 |
+| Trade Frequency | 15% | 10-200 trades/year |
+
+Strategies that pass all minimum thresholds are flagged as candidates for integration into the White Light ensemble. The top-ranked strategies are further validated on QuantConnect before any live deployment consideration.
+
+### 9.6 Tools Summary
+
+| Tool | Purpose | Cost | Integration |
+|------|---------|------|-------------|
+| TradingView | Strategy discovery (150K+ scripts) | Free (browsing) | tradingview-script-downloader |
+| Pineify | Pine Script → Python conversion | Free tier available | Web API or manual |
+| StrategyGenerator | Open-source Pine Script parser | Free (GitHub) | Python library |
+| VectorBT | Fast vectorized backtesting | Free (open-source) | pip install |
+| Backtrader | Event-driven backtesting | Free (open-source) | pip install |
+| QuantConnect LEAN | Cloud backtesting + C2 bridge | Free tier available | Web platform |
+| PRAW | Reddit scraping | Free (Reddit API) | pip install |
+| discord.py | Discord monitoring | Free (open-source) | pip install |
+| Kinfo | Live performance verification | Free tier available | Brokerage API sync |
+
+---
+
+## 10. Future Enhancements (Phase 2)
 
 ### 9.1 Interactive Brokers Integration
 
@@ -512,7 +682,7 @@ Extend API connectivity to E-Trade and potentially Fidelity (if/when a public AP
 
 ---
 
-## 10. Glossary
+## 11. Glossary
 
 | Term | Definition |
 |------|-----------|
@@ -539,6 +709,13 @@ Extend API connectivity to E-Trade and potentially Fidelity (if/when a public AP
 | ROC | Rate of Change — percentage change over N periods; used to measure momentum velocity |
 | Parquet | Columnar file format optimized for analytical queries; 10-100x faster than CSV for time-series data |
 | Massive API | Polygon-compatible REST API at `api.massive.com` used as the primary market data source |
+| Pine Script | TradingView's proprietary scripting language for writing indicators and strategies; must be converted to Python for local backtesting |
+| VectorBT | Vectorized backtesting framework for Python; 100-1000x faster than event-driven alternatives |
+| Backtrader | Event-driven Python backtesting framework with realistic broker simulation (slippage, commissions) |
+| QuantConnect | Cloud-based backtesting platform running the open-source LEAN engine; has native Collective2 integration |
+| Kinfo | Third-party trade journal that syncs with brokerages to independently verify live trading performance |
+| PRAW | Python Reddit API Wrapper — library for programmatic access to Reddit posts and comments |
+| Pineify | AI-powered tool for converting Pine Script to Python code |
 
 ---
 
