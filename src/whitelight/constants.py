@@ -3,10 +3,11 @@
 # Traded instruments
 TQQQ = "TQQQ"
 SQQQ = "SQQQ"
+BIL = "BIL"   # SPDR Bloomberg 1-3 Month T-Bill ETF (bond proxy for idle cash)
 NDX = "NDX"
 
-TRADED_SYMBOLS = [TQQQ, SQQQ]
-ALL_SYMBOLS = [NDX, TQQQ, SQQQ]
+TRADED_SYMBOLS = [TQQQ, SQQQ, BIL]
+ALL_SYMBOLS = [NDX, TQQQ, SQQQ, BIL]
 
 # SMA periods (days)
 SMA_SHORT = 10

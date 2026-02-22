@@ -12,7 +12,7 @@ def format_target_allocation(target: TargetAllocation) -> str:
     lines = [
         f"TQQQ: {float(target.tqqq_pct)*100:.1f}%",
         f"SQQQ: {float(target.sqqq_pct)*100:.1f}%",
-        f"Cash: {float(target.cash_pct)*100:.1f}%",
+        f"Bonds (BIL): {float(target.cash_pct)*100:.1f}%",
     ]
     if target.composite_score != 0.0:
         lines.append(f"Composite Score: {target.composite_score:+.3f}")

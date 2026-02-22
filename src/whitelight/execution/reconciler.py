@@ -26,6 +26,7 @@ def check_rebalance_needed(
     for symbol, target_pct in [
         ("TQQQ", target.tqqq_pct),
         ("SQQQ", target.sqqq_pct),
+        ("BIL", target.cash_pct),
     ]:
         current_value = snapshot.positions_by_symbol.get(symbol, Decimal("0"))
         # Approximate current allocation

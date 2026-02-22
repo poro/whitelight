@@ -76,7 +76,7 @@ class TestCheckRebalanceNeeded:
         """TQQQ: current ~30% vs target 30% -> delta ~0% < 5%."""
         snap = _snapshot(
             equity=Decimal("100000"),
-            positions_by_symbol={"TQQQ": Decimal("30000")},
+            positions_by_symbol={"TQQQ": Decimal("30000"), "BIL": Decimal("70000")},
         )
         target = _target(tqqq_pct=Decimal("0.30"))
         assert check_rebalance_needed(snap, target, threshold=0.05) is False
@@ -98,12 +98,13 @@ class TestCheckRebalanceNeeded:
         assert check_rebalance_needed(snap, target, threshold=0.05) is True
 
     def test_small_delta_returns_false(self):
-        """Both TQQQ and SQQQ deltas below threshold."""
+        """Both TQQQ, SQQQ, and BIL deltas below threshold."""
         snap = _snapshot(
             equity=Decimal("100000"),
-            positions_by_symbol={"TQQQ": Decimal("29000")},
+            positions_by_symbol={"TQQQ": Decimal("29000"), "BIL": Decimal("71000")},
         )
         # Current TQQQ pct = 29000/100000 = 0.29, target = 0.30 -> delta = 0.01 < 0.05
+        # Current BIL pct = 71000/100000 = 0.71, target = 0.70 -> delta = 0.01 < 0.05
         target = _target(tqqq_pct=Decimal("0.30"))
         assert check_rebalance_needed(snap, target, threshold=0.05) is False
 
@@ -111,9 +112,10 @@ class TestCheckRebalanceNeeded:
         """A stricter threshold should trigger rebalance on smaller deltas."""
         snap = _snapshot(
             equity=Decimal("100000"),
-            positions_by_symbol={"TQQQ": Decimal("28000")},
+            positions_by_symbol={"TQQQ": Decimal("28000"), "BIL": Decimal("72000")},
         )
-        # Delta = |0.30 - 0.28| = 0.02
+        # TQQQ delta = |0.30 - 0.28| = 0.02
+        # BIL delta = |0.70 - 0.72| = 0.02
         target = _target(tqqq_pct=Decimal("0.30"))
         # With threshold=0.01 -> 0.02 >= 0.01 -> True
         assert check_rebalance_needed(snap, target, threshold=0.01) is True
@@ -121,12 +123,12 @@ class TestCheckRebalanceNeeded:
         assert check_rebalance_needed(snap, target, threshold=0.05) is False
 
     def test_no_positions_vs_cash_target_no_rebalance(self):
-        """If target is 100% cash and we hold 100% cash, no rebalance needed."""
+        """If target is 100% BIL and we hold 100% BIL, no rebalance needed."""
         snap = _snapshot(
             equity=Decimal("100000"),
-            positions_by_symbol={},
+            positions_by_symbol={"BIL": Decimal("100000")},
         )
-        target = _target()  # All cash
+        target = _target()  # All cash/BIL
         assert check_rebalance_needed(snap, target, threshold=0.05) is False
 
     def test_uses_mock_portfolio_fixture(self, mock_portfolio_snapshot):

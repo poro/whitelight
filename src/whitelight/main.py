@@ -89,7 +89,7 @@ async def run_pipeline(config: WhiteLightConfig, dry_run: bool = False) -> None:
 
         await reporter.report_target_allocation(target)
         logger.info(
-            "Target: TQQQ=%.1f%% SQQQ=%.1f%% Cash=%.1f%% (score=%.3f)",
+            "Target: TQQQ=%.1f%% SQQQ=%.1f%% BIL=%.1f%% (score=%.3f)",
             float(target.tqqq_pct) * 100,
             float(target.sqqq_pct) * 100,
             float(target.cash_pct) * 100,

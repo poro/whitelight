@@ -170,6 +170,7 @@ class OrderExecutor:
         for symbol, target_pct in [
             ("TQQQ", target.tqqq_pct),
             ("SQQQ", target.sqqq_pct),
+            ("BIL", target.cash_pct),  # Invest "cash" portion in T-bill ETF
         ]:
             price = self._get_live_price(symbol)
             if price <= 0:
