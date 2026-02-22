@@ -16,34 +16,34 @@ class SignalCombiner:
 
     Mapping rules
     -------------
-    * composite >= +0.2  --> long TQQQ, no SQQQ
-    * composite in (-0.1, +0.2) --> all cash (dead zone)
-    * composite <= -0.1  --> long SQQQ, no TQQQ
+    * composite >= +0.1  --> long TQQQ up to 90%, no SQQQ
+    * composite in (-0.1, +0.1) --> all cash (dead zone)
+    * composite <= -0.1  --> long SQQQ up to 20%, no TQQQ
 
     Override rules
     --------------
     * **Strong bull floor:** If all 4 trend strategies (S1-S4) have raw_score >= +0.8,
-      TQQQ allocation is floored at 30% (don't fight a strong bull).
+      TQQQ allocation is floored at 50% (don't fight a strong bull).
     * **Crisis mode cap:** If S5 (momentum) <= -0.5 AND S7 (volatility) <= -0.3,
-      TQQQ is hard-capped at 10% (protect against leveraged decay in crisis).
+      TQQQ is hard-capped at 20% (protect against leveraged decay in crisis).
     * **No direct flip:** The combiner never outputs TQQQ > 0 and SQQQ > 0
       simultaneously. If the previous allocation had TQQQ > 0 and the new
       allocation would have SQQQ > 0 (or vice versa), force 100% cash instead.
     """
 
-    MAX_TQQQ_PCT = Decimal("0.50")
-    MAX_SQQQ_PCT = Decimal("0.30")
+    MAX_TQQQ_PCT = Decimal("0.90")
+    MAX_SQQQ_PCT = Decimal("0.20")
 
-    BULL_THRESHOLD = 0.2
+    BULL_THRESHOLD = 0.1
     BEAR_THRESHOLD = -0.1
 
-    BULL_SCALE = 0.60
-    BEAR_SCALE = 0.40
+    BULL_SCALE = 1.20
+    BEAR_SCALE = 0.30
 
     # Override thresholds
-    STRONG_BULL_FLOOR = Decimal("0.30")
+    STRONG_BULL_FLOOR = Decimal("0.50")
     STRONG_BULL_SIGNAL_THRESHOLD = 0.8
-    CRISIS_TQQQ_CAP = Decimal("0.10")
+    CRISIS_TQQQ_CAP = Decimal("0.20")
     CRISIS_S5_THRESHOLD = -0.5
     CRISIS_S7_THRESHOLD = -0.3
 
