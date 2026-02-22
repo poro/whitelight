@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 async def run_pipeline(config: WhiteLightConfig, dry_run: bool = False) -> None:
     """Full daily pipeline: boot -> sync -> strategy -> execute -> telemetry -> shutdown."""
     from whitelight.data.sync import DataSyncer
-    from whitelight.data.polygon_client import PolygonClient
+    from whitelight.data.massive_client import MassiveClient
     from whitelight.data.cache import CacheManager
     from whitelight.data.calendar import MarketCalendar
     from whitelight.execution.executor import OrderExecutor
@@ -53,11 +53,11 @@ async def run_pipeline(config: WhiteLightConfig, dry_run: bool = False) -> None:
             await brokerage.connect()
 
         # ---- 2. DATA SYNC ----
-        polygon_key = secrets.get_secret("polygon/api_key")
-        polygon_client = PolygonClient(api_key=polygon_key)
+        api_key = secrets.get_secret("polygon/api_key")
+        data_client = MassiveClient(api_key=api_key)
         cache = CacheManager(cache_dir=config.data.cache_dir)
         syncer = DataSyncer(
-            polygon_client=polygon_client,
+            polygon_client=data_client,
             cache_manager=cache,
             data_config=config.data,
         )
@@ -204,13 +204,13 @@ def cli_entry() -> None:
         asyncio.run(run_pipeline(config, dry_run=args.dry_run))
     elif args.command == "sync":
         from whitelight.data.sync import DataSyncer
-        from whitelight.data.polygon_client import PolygonClient
+        from whitelight.data.massive_client import MassiveClient
         from whitelight.data.cache import CacheManager
         from whitelight.providers import create_secrets_provider
 
         secrets = create_secrets_provider(config.secrets)
-        polygon_key = secrets.get_secret("polygon/api_key")
-        client = PolygonClient(api_key=polygon_key)
+        api_key = secrets.get_secret("polygon/api_key")
+        client = MassiveClient(api_key=api_key)
         cache = CacheManager(cache_dir=config.data.cache_dir)
         syncer = DataSyncer(
             polygon_client=client,

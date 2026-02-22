@@ -6,7 +6,8 @@ Usage examples::
     python scripts/backtest.py                                  # Full backtest, default dates
     python scripts/backtest.py --start 2022-07-23               # From C2 inception
     python scripts/backtest.py --source yfinance                # Use free Yahoo data (default)
-    python scripts/backtest.py --source polygon --api-key KEY   # Use Polygon data
+    python scripts/backtest.py --source massive --api-key KEY   # Use Massive REST API
+    python scripts/backtest.py --source polygon --api-key KEY   # Use Polygon REST API
     python scripts/backtest.py --compare-c2                     # Compare against C2 monthly returns
 """
 
@@ -101,6 +102,30 @@ def _load_data_yfinance(
     tqqq = client.get_daily_bars("TQQQ", warmup_start, end_date)
 
     print(f"Downloading SQQQ data ({warmup_start} to {end_date})...")
+    sqqq = client.get_daily_bars("SQQQ", warmup_start, end_date)
+
+    return ndx, tqqq, sqqq
+
+
+def _load_data_massive(
+    api_key: str,
+    start_date: date,
+    end_date: date,
+    warmup_days: int,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """Download NDX, TQQQ, and SQQQ data from Massive REST API."""
+    from whitelight.data.massive_client import MassiveClient
+
+    client = MassiveClient(api_key=api_key)
+    warmup_start = start_date - timedelta(days=int(warmup_days * 1.5))
+
+    print(f"Downloading NDX data from Massive ({warmup_start} to {end_date})...")
+    ndx = client.get_daily_bars("NDX", warmup_start, end_date)
+
+    print(f"Downloading TQQQ data from Massive ({warmup_start} to {end_date})...")
+    tqqq = client.get_daily_bars("TQQQ", warmup_start, end_date)
+
+    print(f"Downloading SQQQ data from Massive ({warmup_start} to {end_date})...")
     sqqq = client.get_daily_bars("SQQQ", warmup_start, end_date)
 
     return ndx, tqqq, sqqq
@@ -291,7 +316,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--source",
-        choices=["yfinance", "polygon", "cache"],
+        choices=["yfinance", "massive", "polygon", "cache"],
         default="yfinance",
         help="Data source.  Default: yfinance",
     )
@@ -299,7 +324,7 @@ def main() -> None:
         "--api-key",
         type=str,
         default=None,
-        help="Polygon.io API key (required if --source polygon)",
+        help="API key (required if --source massive or polygon)",
     )
     parser.add_argument(
         "--cache-dir",
@@ -354,6 +379,11 @@ def main() -> None:
     # Load data.
     if args.source == "yfinance":
         ndx, tqqq, sqqq = _load_data_yfinance(start_date, end_date, args.warmup)
+    elif args.source == "massive":
+        if not args.api_key:
+            print("ERROR: --api-key is required when using --source massive")
+            sys.exit(1)
+        ndx, tqqq, sqqq = _load_data_massive(args.api_key, start_date, end_date, args.warmup)
     elif args.source == "polygon":
         if not args.api_key:
             print("ERROR: --api-key is required when using --source polygon")

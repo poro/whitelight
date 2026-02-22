@@ -1,39 +1,50 @@
 """Data synchronisation orchestrator.
 
 Keeps the local Parquet cache up-to-date by fetching delta bars from
-Polygon.io when the cache is stale.  Falls back gracefully to cached
-data if the API is unavailable.
+the market data provider (Massive or Polygon) when the cache is stale.
+Falls back gracefully to cached data if the API is unavailable.
 """
 
 from __future__ import annotations
 
 import logging
 from datetime import date, timedelta
-from typing import Optional
+from typing import Optional, Protocol, runtime_checkable
 
 import pandas as pd
 
 from whitelight.config import DataConfig
 from whitelight.data.cache import CacheManager
 from whitelight.data.calendar import MarketCalendar
-from whitelight.data.polygon_client import PolygonClient, PolygonAPIError
 
 logger = logging.getLogger(__name__)
+
+
+@runtime_checkable
+class MarketDataClient(Protocol):
+    """Any client that can fetch daily OHLCV bars."""
+
+    def get_daily_bars(
+        self, ticker: str, start_date: date, end_date: date
+    ) -> pd.DataFrame: ...
 
 
 class DataSyncer:
     """Coordinate cache reads, staleness checks, API fetches, and validation.
 
+    Accepts any client implementing :class:`MarketDataClient` (MassiveClient,
+    PolygonClient, or YFinanceClient).
+
     Typical usage::
 
-        syncer = DataSyncer(polygon_client, cache_manager, data_config)
+        syncer = DataSyncer(client, cache_manager, data_config)
         frames = syncer.sync(["NDX", "TQQQ", "SQQQ"])
         ndx_df = frames["NDX"]
     """
 
     def __init__(
         self,
-        polygon_client: PolygonClient,
+        polygon_client: MarketDataClient,
         cache_manager: CacheManager,
         data_config: DataConfig,
         calendar: Optional[MarketCalendar] = None,
@@ -84,14 +95,9 @@ class DataSyncer:
         logger.info("Fetching %s from %s to %s", ticker, fetch_start, fetch_end)
         try:
             new_bars = self._polygon.get_daily_bars(ticker, fetch_start, fetch_end)
-        except PolygonAPIError as exc:
-            logger.error(
-                "Polygon API error for %s: %s — falling back to cache", ticker, exc
-            )
-            return self._cache.read(ticker)
         except Exception as exc:
             logger.error(
-                "Unexpected error fetching %s: %s — falling back to cache", ticker, exc
+                "API error for %s: %s — falling back to cache", ticker, exc
             )
             return self._cache.read(ticker)
 
