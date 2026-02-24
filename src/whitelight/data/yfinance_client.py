@@ -29,6 +29,7 @@ class YFinanceClient:
         "NDX": "^NDX",
         "TQQQ": "TQQQ",
         "SQQQ": "SQQQ",
+        "BIL": "BIL",
     }
 
     def get_daily_bars(

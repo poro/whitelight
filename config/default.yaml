@@ -22,6 +22,7 @@ data:
     - "NDX"
     - "TQQQ"
     - "SQQQ"
+    - "BIL"
   history_start_date: "1985-01-01"
   sync_timeout_seconds: 120
 
@@ -96,7 +97,7 @@ strategy:
       trend_filter_period: 100
 
 execution:
-  window_start_minutes_before_close: 15
+  window_start_minutes_before_close: 30
   window_end_minutes_before_close: 1
   max_retry_attempts: 5
   retry_backoff_base_seconds: 2.0

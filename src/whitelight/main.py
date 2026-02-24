@@ -69,6 +69,84 @@ async def run_pipeline(config: WhiteLightConfig, dry_run: bool = False) -> None:
 
         logger.info("NDX data loaded: %d rows, latest date: %s", len(ndx_data), ndx_data.index[-1])
 
+        # ---- 2b. INTRADAY SUPPLEMENT ----
+        # Append today's real-time prices so ALL signals reflect the current
+        # session, not just yesterday's close.  NDX comes from yfinance
+        # (intraday), TQQQ/SQQQ/BIL come from Alpaca real-time quotes.
+        try:
+            import yfinance as yf
+            import pandas as pd
+            from datetime import date as _date
+
+            today = _date.today()
+
+            # --- NDX from yfinance (index — not available via Alpaca) ---
+            last_cached = ndx_data.index[-1]
+            if hasattr(last_cached, 'date'):
+                last_date = last_cached.date() if hasattr(last_cached, 'date') else last_cached
+            else:
+                last_date = pd.Timestamp(last_cached).date()
+
+            if last_date < today:
+                intraday = yf.download("^NDX", period="1d", interval="1m", progress=False)
+                if len(intraday) > 0:
+                    latest_close = float(intraday["Close"].iloc[-1].values[0])
+                    today_row = pd.DataFrame(
+                        {"open": latest_close, "high": latest_close, "low": latest_close, "close": latest_close, "volume": 0},
+                        index=[pd.Timestamp(today)],
+                    )
+                    ndx_data = pd.concat([ndx_data, today_row])
+                    data["NDX"] = ndx_data
+                    logger.info("Appended today's intraday NDX: %.2f (total rows: %d)", latest_close, len(ndx_data))
+                else:
+                    logger.warning("No intraday NDX data from yfinance — using cached data only")
+
+            # --- TQQQ/SQQQ/BIL from Alpaca real-time quotes ---
+            try:
+                from alpaca.data.historical import StockHistoricalDataClient
+                from alpaca.data.requests import StockLatestQuoteRequest
+
+                alpaca_data_client = StockHistoricalDataClient(
+                    secrets.get_secret("alpaca/api_key"),
+                    secrets.get_secret("alpaca/api_secret"),
+                )
+                equity_tickers = ["TQQQ", "SQQQ", "BIL"]
+                raw_quotes = alpaca_data_client.get_stock_latest_quote(
+                    StockLatestQuoteRequest(symbol_or_symbols=equity_tickers)
+                )
+                for sym in equity_tickers:
+                    if sym not in raw_quotes:
+                        continue
+                    q = raw_quotes[sym]
+                    mid_price = float((q.bid_price + q.ask_price) / 2)
+                    if mid_price <= 0:
+                        logger.warning("Alpaca quote for %s has zero/negative mid price, skipping", sym)
+                        continue
+
+                    sym_data = data.get(sym)
+                    if sym_data is None or sym_data.empty:
+                        logger.warning("No cached data for %s to supplement", sym)
+                        continue
+
+                    sym_last = sym_data.index[-1]
+                    sym_last_date = sym_last.date() if hasattr(sym_last, 'date') else pd.Timestamp(sym_last).date()
+
+                    if sym_last_date < today:
+                        today_row = pd.DataFrame(
+                            {"open": mid_price, "high": mid_price, "low": mid_price, "close": mid_price, "volume": 0},
+                            index=[pd.Timestamp(today)],
+                        )
+                        data[sym] = pd.concat([sym_data, today_row])
+                        logger.info("Appended Alpaca real-time %s: $%.2f (total rows: %d)", sym, mid_price, len(data[sym]))
+                    else:
+                        logger.info("Cache for %s already has today's data", sym)
+
+            except Exception as e:
+                logger.warning("Alpaca real-time supplement failed (non-fatal): %s", e)
+
+        except Exception as e:
+            logger.warning("Intraday supplement failed (non-fatal): %s", e)
+
         # ---- 3. STRATEGY ENGINE ----
         weights = config.strategy.substrategy_weights
         params = config.strategy.params
@@ -132,8 +210,29 @@ async def run_pipeline(config: WhiteLightConfig, dry_run: bool = False) -> None:
             )
             return
 
-        # Get live prices for execution
+        # Get live prices for execution via Alpaca real-time quotes
+        _live_quotes: dict[str, Decimal] = {}
+        try:
+            from alpaca.data.historical import StockHistoricalDataClient
+            from alpaca.data.requests import StockLatestQuoteRequest
+            _data_client = StockHistoricalDataClient(
+                secrets.get_secret("alpaca/api_key"),
+                secrets.get_secret("alpaca/api_secret"),
+            )
+            _raw_quotes = _data_client.get_stock_latest_quote(
+                StockLatestQuoteRequest(symbol_or_symbols=["TQQQ", "SQQQ", "BIL"])
+            )
+            for sym, q in _raw_quotes.items():
+                mid = (q.bid_price + q.ask_price) / 2
+                _live_quotes[sym] = Decimal(str(round(mid, 4)))
+                logger.info("Live quote %s: bid=%.2f ask=%.2f mid=%.4f", sym, q.bid_price, q.ask_price, mid)
+        except Exception as e:
+            logger.warning("Alpaca live quotes failed, falling back to cached prices: %s", e)
+
         def get_live_price(symbol: str) -> Decimal:
+            # Prefer real-time Alpaca quote, fall back to cached close
+            if symbol in _live_quotes:
+                return _live_quotes[symbol]
             ticker_data = data.get(symbol)
             if ticker_data is not None and not ticker_data.empty:
                 return Decimal(str(ticker_data["close"].iloc[-1]))

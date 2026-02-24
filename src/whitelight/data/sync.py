@@ -136,8 +136,9 @@ class DataSyncer:
     def _fetch_end_date(self) -> date:
         """Return today (or the most recent past trading day) as the fetch end.
 
-        Polygon data for the current day becomes available after market close,
-        so we use today's date and let the API return however many bars are
-        available.
+        Polygon free tier returns 403 for same-day equity data (TQQQ, SQQQ,
+        BIL) but allows same-day index data (NDX).  We always request up to
+        today and let the API return whatever it can — the 403 fallback in
+        sync_ticker() handles failures gracefully.
         """
         return date.today()

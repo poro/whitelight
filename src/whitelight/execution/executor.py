@@ -172,7 +172,11 @@ class OrderExecutor:
             ("SQQQ", target.sqqq_pct),
             ("BIL", target.cash_pct),  # Invest "cash" portion in T-bill ETF
         ]:
-            price = self._get_live_price(symbol)
+            try:
+                price = self._get_live_price(symbol)
+            except (ValueError, KeyError) as e:
+                logger.warning("No price for %s, skipping: %s", symbol, e)
+                continue
             if price <= 0:
                 logger.error("Invalid price for %s: %s", symbol, price)
                 continue

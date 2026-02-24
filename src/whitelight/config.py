@@ -52,7 +52,7 @@ class DataConfig(BaseModel):
     polygon_base_url: str = "https://api.polygon.io"
     cache_dir: str = "./data"
     cache_format: str = "parquet"
-    tickers: list[str] = ["NDX", "TQQQ", "SQQQ"]
+    tickers: list[str] = ["NDX", "TQQQ", "SQQQ", "BIL"]
     history_start_date: str = "1985-01-01"
     sync_timeout_seconds: int = 120
 
