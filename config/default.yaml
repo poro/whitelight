@@ -32,7 +32,7 @@ brokerages:
   failover_enabled: true
 
   alpaca:
-    paper: true
+    paper: false
     timeout_seconds: 30
 
   ibkr:
