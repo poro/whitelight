@@ -104,8 +104,8 @@ crypto:
   timeframe: "4Hour"
   base_allocation: 10000
   target_vol: 0.15
-  bull_threshold: 0.15
-  bear_threshold: -0.10
+  bull_threshold: 0.30
+  bear_threshold: -0.30
   min_bars: 400
   schedule: "0 */4 * * *"  # every 4 hours
 
