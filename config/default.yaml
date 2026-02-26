@@ -52,11 +52,11 @@ strategy:
     s7_volatility_regime: 0.10
 
   allocation_tiers:
-    - threshold: 0.2
+    - threshold: 0.25
       tqqq_scale: 0.60
       tqqq_cap: 0.50
       sqqq: 0.00
-    - threshold: -0.1
+    - threshold: -0.15
       tqqq: 0.00
       sqqq: 0.00
     - threshold: -999
