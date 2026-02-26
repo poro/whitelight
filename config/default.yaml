@@ -96,6 +96,19 @@ strategy:
       long_period: 60
       trend_filter_period: 100
 
+crypto:
+  enabled: true
+  symbols:
+    - "BTC/USD"
+    - "ETH/USD"
+  timeframe: "4Hour"
+  base_allocation: 10000
+  target_vol: 0.15
+  bull_threshold: 0.15
+  bear_threshold: -0.10
+  min_bars: 400
+  schedule: "0 */4 * * *"  # every 4 hours
+
 execution:
   window_start_minutes_before_close: 30
   window_end_minutes_before_close: 1
