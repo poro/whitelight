@@ -100,7 +100,6 @@ crypto:
   enabled: true
   symbols:
     - "BTC/USD"
-    - "ETH/USD"
   timeframe: "4Hour"
   base_allocation: 10000
   target_vol: 0.15
